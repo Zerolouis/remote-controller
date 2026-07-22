@@ -1,0 +1,28 @@
+# Flutter and Dart
+.dart_tool/
+.flutter-plugins
+.flutter-plugins-dependencies
+.packages
+build/
+coverage/
+
+# Visual Studio and CMake
+.vs/
+CMakeSettings.json
+out/
+
+# IDE and operating system
+.idea/
+*.iml
+*.user
+*.suo
+*.swp
+.DS_Store
+Thumbs.db
+
+# Local research checkouts and generated diagnostics
+.research/
+*.log
+
+# Generated ephemeral Flutter files
+apps/remote_controller/windows/flutter/ephemeral/
