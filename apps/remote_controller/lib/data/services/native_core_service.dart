@@ -6,6 +6,7 @@ import 'package:remote_controller_core/remote_controller_core.dart';
 
 final class NativeCoreService {
   SdlInputCapture? _inputCapture;
+  LocalControllerBridge? _localBridge;
 
   int getAbiVersion() => RemoteControllerCore.abiVersion;
 
@@ -15,7 +16,10 @@ final class NativeCoreService {
 
   List<SdlGamepadDevice> enumerateInputDevices() => SdlInput.enumerateGamepads();
 
+  VigemRuntimeInfo getVirtualControllerRuntime() => VigemController.runtimeInfo;
+
   void startInputCapture(int instanceId) {
+    stopLocalBridge();
     stopInputCapture();
     final capture = SdlInput.createCapture(instanceId);
     try {
@@ -40,7 +44,36 @@ final class NativeCoreService {
     _inputCapture = null;
   }
 
-  void dispose() => stopInputCapture();
+  void startLocalBridge(int instanceId) {
+    stopInputCapture();
+    stopLocalBridge();
+    final bridge = VigemController.createLocalBridge(instanceId);
+    try {
+      bridge.start();
+      _localBridge = bridge;
+    } on Object {
+      bridge.close();
+      rethrow;
+    }
+  }
+
+  LocalBridgeSnapshot getLocalBridgeSnapshot() {
+    final bridge = _localBridge;
+    if (bridge == null) {
+      throw StateError('No local controller bridge is active.');
+    }
+    return bridge.snapshot();
+  }
+
+  void stopLocalBridge() {
+    _localBridge?.close();
+    _localBridge = null;
+  }
+
+  void dispose() {
+    stopInputCapture();
+    stopLocalBridge();
+  }
 
   Future<LoopbackDiagnosticData> runLoopbackDiagnostic() async {
     final stopwatch = Stopwatch()..start();

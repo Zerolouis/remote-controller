@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:remote_controller/domain/models/app_role.dart';
 import 'package:remote_controller/domain/models/input_capture_snapshot.dart';
 import 'package:remote_controller/domain/models/input_device.dart';
+import 'package:remote_controller/domain/models/virtual_controller.dart';
 import 'package:remote_controller/ui/features/home/view_models/home_view_model.dart';
 
 class HomeView extends StatelessWidget {
@@ -224,12 +225,15 @@ class _RoleDashboard extends StatelessWidget {
               const SizedBox(height: 8),
               Text(
                 isClient
-                    ? 'SDL 3 实体手柄读取已就绪；独占、网络和远端虚拟手柄尚未启用。'
-                    : '原生安全会话与本机 loopback 已就绪，虚拟手柄和网络后端尚未启用。',
+                    ? 'SDL 3 读取和 ViGEm 本机桥接已就绪；独占与网络尚未启用。'
+                    : 'ViGEm 虚拟 Xbox 360 后端已就绪；网络会话尚未启用。',
               ),
               if (isClient) ...[
                 const SizedBox(height: 20),
                 _InputDeviceCard(viewModel: viewModel),
+              ] else ...[
+                const SizedBox(height: 20),
+                _VirtualControllerCard(viewModel: viewModel),
               ],
               const SizedBox(height: 20),
               _LoopbackDiagnosticCard(viewModel: viewModel),
@@ -264,6 +268,8 @@ class _InputDeviceCard extends StatelessWidget {
     final error = viewModel.inputError;
     final loading = viewModel.isLoadingInputDevices;
     final capture = viewModel.inputCaptureSnapshot;
+    final bridge = viewModel.localBridgeSnapshot;
+    final vigem = viewModel.virtualControllerRuntime;
 
     return Card(
       child: Padding(
@@ -283,13 +289,28 @@ class _InputDeviceCard extends StatelessWidget {
                 ),
                 OutlinedButton.icon(
                   key: const Key('refresh-input-devices'),
-                  onPressed: loading || viewModel.capturedDeviceId != null
+                  onPressed:
+                      loading ||
+                          viewModel.capturedDeviceId != null ||
+                          viewModel.bridgedDeviceId != null
                       ? null
                       : viewModel.refreshInputDevices,
                   icon: const Icon(Icons.refresh_rounded),
                   label: const Text('重新扫描'),
                 ),
               ],
+            ),
+            const SizedBox(height: 6),
+            Text(
+              vigem == null
+                  ? 'ViGEmBus 状态未知'
+                  : vigem.available
+                  ? 'ViGEmBus 可用 · 可创建单个虚拟 Xbox 360 手柄并接收震动'
+                  : 'ViGEmBus 不可用：${vigem.error}',
+              key: const Key('vigem-runtime-status'),
+              style: TextStyle(
+                color: vigem?.available == true ? const Color(0xff5eead4) : const Color(0xffff8fa3),
+              ),
             ),
             const SizedBox(height: 8),
             Text(
@@ -325,6 +346,17 @@ class _InputDeviceCard extends StatelessWidget {
               const SizedBox(height: 14),
               _RawCapturePanel(snapshot: capture),
             ],
+            if (viewModel.bridgeError != null) ...[
+              const SizedBox(height: 14),
+              Text(
+                '本机桥接错误：${viewModel.bridgeError}',
+                style: const TextStyle(color: Color(0xffff8fa3)),
+              ),
+            ],
+            if (bridge != null) ...[
+              const SizedBox(height: 14),
+              _LocalBridgePanel(snapshot: bridge),
+            ],
           ],
         ),
       ),
@@ -340,8 +372,12 @@ class _InputDeviceTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final active = viewModel.capturedDeviceId == device.instanceId;
-    final anotherActive = viewModel.capturedDeviceId != null && !active;
+    final captureActive = viewModel.capturedDeviceId == device.instanceId;
+    final bridgeActive = viewModel.bridgedDeviceId == device.instanceId;
+    final active = captureActive || bridgeActive;
+    final anotherActive =
+        (viewModel.capturedDeviceId != null && !captureActive) ||
+        (viewModel.bridgedDeviceId != null && !bridgeActive);
     return DecoratedBox(
       key: Key('input-device-${device.instanceId}'),
       decoration: BoxDecoration(
@@ -404,17 +440,151 @@ class _InputDeviceTile extends StatelessWidget {
               ),
             ],
             const SizedBox(height: 12),
-            OutlinedButton.icon(
-              key: Key(
-                active ? 'stop-input-capture' : 'capture-device-${device.instanceId}',
+            Wrap(
+              spacing: 10,
+              runSpacing: 10,
+              children: [
+                OutlinedButton.icon(
+                  key: Key(
+                    captureActive ? 'stop-input-capture' : 'capture-device-${device.instanceId}',
+                  ),
+                  onPressed: anotherActive || bridgeActive
+                      ? null
+                      : captureActive
+                      ? viewModel.stopInputCapture
+                      : () => viewModel.startInputCapture(device),
+                  icon: Icon(
+                    captureActive ? Icons.stop_rounded : Icons.monitor_heart_rounded,
+                  ),
+                  label: Text(captureActive ? '停止原始值记录' : '记录原始值'),
+                ),
+                FilledButton.tonalIcon(
+                  key: Key(
+                    bridgeActive ? 'stop-local-bridge' : 'bridge-device-${device.instanceId}',
+                  ),
+                  onPressed:
+                      anotherActive ||
+                          captureActive ||
+                          viewModel.virtualControllerRuntime?.available != true
+                      ? null
+                      : bridgeActive
+                      ? viewModel.stopLocalBridge
+                      : () => viewModel.startLocalBridge(device),
+                  icon: Icon(
+                    bridgeActive ? Icons.stop_rounded : Icons.cable_rounded,
+                  ),
+                  label: Text(bridgeActive ? '停止本机桥接' : '桥接到虚拟 X360'),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _VirtualControllerCard extends StatelessWidget {
+  const _VirtualControllerCard({required this.viewModel});
+
+  final HomeViewModel viewModel;
+
+  @override
+  Widget build(BuildContext context) {
+    final runtime = viewModel.virtualControllerRuntime;
+    final available = runtime?.available == true;
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(18),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Icon(
+              available ? Icons.gamepad_rounded : Icons.error_outline_rounded,
+              color: available ? const Color(0xff5eead4) : const Color(0xffff8fa3),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'ViGEm 虚拟 Xbox 360 后端',
+                    style: Theme.of(context).textTheme.titleMedium,
+                  ),
+                  const SizedBox(height: 6),
+                  Text(
+                    runtime == null
+                        ? '驱动状态未知'
+                        : available
+                        ? 'ViGEmBus 已连接，可创建单个 X360 target 并接收双马达震动。'
+                        : 'ViGEmBus 不可用：${runtime.error} '
+                              '(0x${_hex(runtime.resultCode, 8)})',
+                    key: const Key('server-vigem-status'),
+                  ),
+                ],
               ),
-              onPressed: anotherActive
-                  ? null
-                  : active
-                  ? viewModel.stopInputCapture
-                  : () => viewModel.startInputCapture(device),
-              icon: Icon(active ? Icons.stop_rounded : Icons.monitor_heart_rounded),
-              label: Text(active ? '停止原始值记录' : '记录原始值'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _LocalBridgePanel extends StatelessWidget {
+  const _LocalBridgePanel({required this.snapshot});
+
+  final LocalBridgeSnapshot snapshot;
+
+  @override
+  Widget build(BuildContext context) {
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: const Color(0xff17140a),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: const Color(0xfffbbf24)),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(14),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              '本机 SDL → ViGEm · ${snapshot.sampleCount} 个样本 · '
+              '${snapshot.state}',
+              key: const Key('local-bridge-status'),
+              style: Theme.of(context).textTheme.titleSmall,
+            ),
+            const SizedBox(height: 8),
+            const Text(
+              'HidHide 尚未启用：实体和虚拟手柄会同时可见，游戏中可能产生双输入。',
+              style: TextStyle(color: Color(0xfffde68a)),
+            ),
+            const SizedBox(height: 12),
+            Wrap(
+              spacing: 10,
+              runSpacing: 10,
+              children: [
+                _RawMetric(
+                  label: 'Buttons',
+                  value: '0x${_hex(snapshot.buttonFlags, 8)}',
+                ),
+                _RawMetric(label: 'LT', value: '${snapshot.leftTrigger}'),
+                _RawMetric(label: 'RT', value: '${snapshot.rightTrigger}'),
+                _RawMetric(label: 'LX', value: '${snapshot.leftStickX}'),
+                _RawMetric(label: 'LY', value: '${snapshot.leftStickY}'),
+                _RawMetric(label: 'RX', value: '${snapshot.rightStickX}'),
+                _RawMetric(label: 'RY', value: '${snapshot.rightStickY}'),
+              ],
+            ),
+            const SizedBox(height: 12),
+            Text(
+              '震动回调 ${snapshot.rumbleCount} 次 · '
+              '低频 ${snapshot.lowFrequencyMotor} · '
+              '高频 ${snapshot.highFrequencyMotor}',
+              key: const Key('local-bridge-rumble'),
+              style: const TextStyle(fontFamily: 'Consolas'),
             ),
           ],
         ),

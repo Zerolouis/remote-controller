@@ -233,7 +233,7 @@ packages:
       path: "../../packages/remote_controller_core"
       relative: true
     source: path
-    version: "0.3.0"
+    version: "0.4.0"
   sky_engine:
     dependency: transitive
     description: flutter

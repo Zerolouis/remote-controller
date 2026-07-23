@@ -7,6 +7,7 @@ import 'package:remote_controller/domain/models/core_info.dart';
 import 'package:remote_controller/domain/models/input_capture_snapshot.dart';
 import 'package:remote_controller/domain/models/input_device.dart';
 import 'package:remote_controller/domain/models/loopback_diagnostic.dart';
+import 'package:remote_controller/domain/models/virtual_controller.dart' as domain;
 import 'package:remote_controller_core/remote_controller_core.dart';
 
 final class NativeCoreRepository implements CoreRepository {
@@ -67,6 +68,16 @@ final class NativeCoreRepository implements CoreRepository {
       .toList(growable: false);
 
   @override
+  domain.VirtualControllerRuntime getVirtualControllerRuntime() {
+    final runtime = _service.getVirtualControllerRuntime();
+    return domain.VirtualControllerRuntime(
+      available: runtime.available,
+      resultCode: runtime.resultCode,
+      error: runtime.error,
+    );
+  }
+
+  @override
   void startInputCapture(int instanceId) => _service.startInputCapture(instanceId);
 
   @override
@@ -99,6 +110,32 @@ final class NativeCoreRepository implements CoreRepository {
 
   @override
   void stopInputCapture() => _service.stopInputCapture();
+
+  @override
+  void startLocalBridge(int instanceId) => _service.startLocalBridge(instanceId);
+
+  @override
+  domain.LocalBridgeSnapshot getLocalBridgeSnapshot() {
+    final snapshot = _service.getLocalBridgeSnapshot();
+    final state = snapshot.currentState;
+    return domain.LocalBridgeSnapshot(
+      state: snapshot.state.name,
+      sampleCount: snapshot.sampleCount,
+      buttonFlags: state.buttonFlags,
+      leftTrigger: state.leftTrigger,
+      rightTrigger: state.rightTrigger,
+      leftStickX: state.leftStickX,
+      leftStickY: state.leftStickY,
+      rightStickX: state.rightStickX,
+      rightStickY: state.rightStickY,
+      rumbleCount: snapshot.rumbleCount,
+      lowFrequencyMotor: snapshot.lowFrequencyMotor,
+      highFrequencyMotor: snapshot.highFrequencyMotor,
+    );
+  }
+
+  @override
+  void stopLocalBridge() => _service.stopLocalBridge();
 
   @override
   void dispose() => _service.dispose();

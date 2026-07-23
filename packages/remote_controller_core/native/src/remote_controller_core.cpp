@@ -11,16 +11,19 @@
 #include <string_view>
 
 #include "backends/sdl_input_backend.h"
+#include "backends/vigem_virtual_controller_backend.h"
 #include "controller_protocol.h"
 #include "input_capture.h"
+#include "local_controller_bridge.h"
 #include "session.h"
 
 namespace {
 
 constexpr std::uint32_t kAbiVersion = 1;
 constexpr char kBuildInfo[] =
-    "remote-controller-core/0.3.0; abi=1; protocol=1; "
-    "backends=sdl3,loopback,memory-virtual; watchdog=100ms-default";
+    "remote-controller-core/0.4.0; abi=1; protocol=1; "
+    "backends=sdl3,vigem-x360,loopback,memory-virtual; "
+    "watchdog=100ms-default";
 
 remote_controller::protocol::GamepadStateV1 ToNativeState(
     const rc_gamepad_state_v1& state) {
@@ -71,12 +74,26 @@ struct rc_input_capture {
   remote_controller::InputCapture implementation;
 };
 
+struct rc_local_controller_bridge {
+  explicit rc_local_controller_bridge(const std::uint32_t instance_id)
+      : implementation(
+            std::make_unique<
+                remote_controller::backends::SdlInputBackend>(),
+            std::make_unique<remote_controller::backends::
+                                 VigemVirtualControllerBackend>(),
+            std::to_string(instance_id)) {}
+
+  remote_controller::LocalControllerBridge implementation;
+};
+
 static_assert(sizeof(rc_gamepad_state_v1) ==
               sizeof(remote_controller::protocol::GamepadStateV1));
 static_assert(sizeof(rc_session_snapshot_v1) == 56);
 static_assert(sizeof(rc_sdl_runtime_info_v1) == 336);
 static_assert(sizeof(rc_input_device_info_v1) == 712);
 static_assert(sizeof(rc_input_capture_snapshot_v1) == 64);
+static_assert(sizeof(rc_vigem_runtime_info_v1) == 272);
+static_assert(sizeof(rc_local_bridge_snapshot_v1) == 56);
 
 extern "C" RC_API std::uint32_t rc_get_abi_version(void) { return kAbiVersion; }
 
@@ -215,6 +232,85 @@ extern "C" RC_API rc_result rc_input_capture_stop(
 extern "C" RC_API void rc_input_capture_destroy(
     rc_input_capture* capture) {
   delete capture;
+}
+
+extern "C" RC_API rc_result rc_vigem_get_runtime_info(
+    rc_vigem_runtime_info_v1* out_runtime_info) {
+  if (out_runtime_info == nullptr ||
+      out_runtime_info->struct_size != sizeof(rc_vigem_runtime_info_v1)) {
+    return RC_RESULT_INVALID_ARGUMENT;
+  }
+  const auto struct_size = out_runtime_info->struct_size;
+  *out_runtime_info = {};
+  out_runtime_info->struct_size = struct_size;
+
+  const auto runtime = remote_controller::backends::
+      VigemVirtualControllerBackend::Probe();
+  out_runtime_info->available = runtime.available ? 1U : 0U;
+  out_runtime_info->result_code = runtime.result_code;
+  CopyUtf8(out_runtime_info->error, runtime.error);
+  return RC_RESULT_OK;
+}
+
+extern "C" RC_API rc_result rc_local_bridge_create(
+    const std::uint32_t instance_id,
+    rc_local_controller_bridge** out_bridge) {
+  if (out_bridge == nullptr) {
+    return RC_RESULT_INVALID_ARGUMENT;
+  }
+  *out_bridge = nullptr;
+  if (!remote_controller::backends::SdlInputBackend::GetRuntimeInfo()
+           .available) {
+    return RC_RESULT_BACKEND_FAILURE;
+  }
+  auto bridge = new (std::nothrow) rc_local_controller_bridge(instance_id);
+  if (bridge == nullptr) {
+    return RC_RESULT_BACKEND_FAILURE;
+  }
+  *out_bridge = bridge;
+  return RC_RESULT_OK;
+}
+
+extern "C" RC_API rc_result rc_local_bridge_start(
+    rc_local_controller_bridge* bridge) {
+  if (bridge == nullptr) {
+    return RC_RESULT_INVALID_ARGUMENT;
+  }
+  return ToAbiResult(bridge->implementation.Start());
+}
+
+extern "C" RC_API rc_result rc_local_bridge_get_snapshot(
+    rc_local_controller_bridge* bridge,
+    rc_local_bridge_snapshot_v1* out_snapshot) {
+  if (bridge == nullptr || out_snapshot == nullptr ||
+      out_snapshot->struct_size != sizeof(rc_local_bridge_snapshot_v1)) {
+    return RC_RESULT_INVALID_ARGUMENT;
+  }
+  const auto struct_size = out_snapshot->struct_size;
+  const auto source = bridge->implementation.Snapshot();
+  *out_snapshot = {};
+  out_snapshot->struct_size = struct_size;
+  out_snapshot->state = static_cast<std::uint32_t>(source.state);
+  out_snapshot->sample_count = source.sample_count;
+  out_snapshot->timestamp_us = source.timestamp_us;
+  out_snapshot->current_state = ToAbiState(source.current_state);
+  out_snapshot->rumble_count = source.rumble_count;
+  out_snapshot->low_frequency_motor = source.low_frequency_motor;
+  out_snapshot->high_frequency_motor = source.high_frequency_motor;
+  return RC_RESULT_OK;
+}
+
+extern "C" RC_API rc_result rc_local_bridge_stop(
+    rc_local_controller_bridge* bridge) {
+  if (bridge == nullptr) {
+    return RC_RESULT_INVALID_ARGUMENT;
+  }
+  return ToAbiResult(bridge->implementation.Stop());
+}
+
+extern "C" RC_API void rc_local_bridge_destroy(
+    rc_local_controller_bridge* bridge) {
+  delete bridge;
 }
 
 extern "C" RC_API rc_result rc_session_create_loopback(

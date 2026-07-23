@@ -47,6 +47,8 @@ class InputBackend {
   virtual std::vector<InputDeviceInfo> EnumerateDevices() = 0;
   virtual bool Open(const std::string& device_id, StateCallback state_callback,
                     DisconnectCallback disconnect_callback) = 0;
+  virtual bool SetRumble(std::uint16_t low_frequency_motor,
+                         std::uint16_t high_frequency_motor) = 0;
   virtual void Close() noexcept = 0;
 };
 

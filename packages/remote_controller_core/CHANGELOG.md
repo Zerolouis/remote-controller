@@ -1,3 +1,10 @@
+## 0.4.0
+
+- Pin the reviewed Sunshine ViGEmClient fork and compile its minimal X360 client source through Native Assets.
+- Add ViGEmBus probing, a single virtual Xbox 360 target, full-state mapping, and rumble callbacks.
+- Add a native SDL-to-ViGEm diagnostic bridge with Flutter controls and 10 Hz snapshots.
+- Preserve 16-bit trigger values until deterministic 8-bit X360 report quantization.
+
 ## 0.3.0
 
 - Pin SDL 3.4.12 and bundle its official Windows runtime through Native Assets.

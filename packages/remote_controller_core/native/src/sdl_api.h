@@ -51,6 +51,7 @@ class Api final {
   decltype(&SDL_UpdateGamepads) update_gamepads{};
   decltype(&SDL_GetGamepadButton) get_gamepad_button{};
   decltype(&SDL_GetGamepadAxis) get_gamepad_axis{};
+  decltype(&SDL_RumbleGamepad) rumble_gamepad{};
 
  private:
   Api() = default;

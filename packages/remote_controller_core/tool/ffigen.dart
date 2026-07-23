@@ -12,6 +12,11 @@ const _symbols = <String>{
   'rc_input_capture_get_snapshot',
   'rc_input_capture_start',
   'rc_input_capture_stop',
+  'rc_local_bridge_create',
+  'rc_local_bridge_destroy',
+  'rc_local_bridge_get_snapshot',
+  'rc_local_bridge_start',
+  'rc_local_bridge_stop',
   'rc_sdl_capture_create',
   'rc_sdl_enumerate_gamepads',
   'rc_sdl_get_runtime_info',
@@ -22,6 +27,7 @@ const _symbols = <String>{
   'rc_session_start',
   'rc_session_stop',
   'rc_session_submit_state',
+  'rc_vigem_get_runtime_info',
 };
 
 const _leafSymbols = <String>{'rc_get_abi_version', 'rc_get_build_info'};
@@ -54,8 +60,10 @@ void main() {
       'rc_gamepad_state_v1',
       'rc_input_capture_snapshot_v1',
       'rc_input_device_info_v1',
+      'rc_local_bridge_snapshot_v1',
       'rc_sdl_runtime_info_v1',
       'rc_session_snapshot_v1',
+      'rc_vigem_runtime_info_v1',
     }),
     output: Output(
       dartFile: bindings,

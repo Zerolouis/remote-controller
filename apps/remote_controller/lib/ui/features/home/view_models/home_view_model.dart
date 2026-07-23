@@ -10,6 +10,7 @@ import 'package:remote_controller/domain/models/core_info.dart';
 import 'package:remote_controller/domain/models/input_capture_snapshot.dart';
 import 'package:remote_controller/domain/models/input_device.dart';
 import 'package:remote_controller/domain/models/loopback_diagnostic.dart';
+import 'package:remote_controller/domain/models/virtual_controller.dart';
 
 final class HomeViewModel extends ChangeNotifier {
   HomeViewModel(this._coreRepository);
@@ -29,6 +30,11 @@ final class HomeViewModel extends ChangeNotifier {
   int? _capturedDeviceId;
   InputCaptureSnapshot? _inputCaptureSnapshot;
   Timer? _capturePollTimer;
+  VirtualControllerRuntime? _virtualControllerRuntime;
+  int? _bridgedDeviceId;
+  LocalBridgeSnapshot? _localBridgeSnapshot;
+  Object? _bridgeError;
+  Timer? _bridgePollTimer;
 
   CoreInfo? get coreInfo => _coreInfo;
   Object? get coreError => _coreError;
@@ -42,11 +48,16 @@ final class HomeViewModel extends ChangeNotifier {
   Object? get inputError => _inputError;
   int? get capturedDeviceId => _capturedDeviceId;
   InputCaptureSnapshot? get inputCaptureSnapshot => _inputCaptureSnapshot;
+  VirtualControllerRuntime? get virtualControllerRuntime => _virtualControllerRuntime;
+  int? get bridgedDeviceId => _bridgedDeviceId;
+  LocalBridgeSnapshot? get localBridgeSnapshot => _localBridgeSnapshot;
+  Object? get bridgeError => _bridgeError;
 
   void initialize() {
     try {
       _coreInfo = _coreRepository.getCoreInfo();
       _inputRuntime = _coreRepository.getInputRuntime();
+      _virtualControllerRuntime = _coreRepository.getVirtualControllerRuntime();
       _coreError = null;
     } on Object catch (error) {
       _coreInfo = null;
@@ -71,6 +82,7 @@ final class HomeViewModel extends ChangeNotifier {
       return;
     }
     stopInputCapture();
+    stopLocalBridge();
     _selectedRole = null;
     notifyListeners();
   }
@@ -95,7 +107,7 @@ final class HomeViewModel extends ChangeNotifier {
   }
 
   Future<void> refreshInputDevices() async {
-    if (_isLoadingInputDevices || _capturedDeviceId != null) {
+    if (_isLoadingInputDevices || _capturedDeviceId != null || _bridgedDeviceId != null) {
       return;
     }
     _isLoadingInputDevices = true;
@@ -113,6 +125,7 @@ final class HomeViewModel extends ChangeNotifier {
   }
 
   void startInputCapture(InputDevice device) {
+    stopLocalBridge();
     if (_capturedDeviceId != null) {
       stopInputCapture();
     }
@@ -159,9 +172,58 @@ final class HomeViewModel extends ChangeNotifier {
     notifyListeners();
   }
 
+  void startLocalBridge(InputDevice device) {
+    stopInputCapture();
+    if (_bridgedDeviceId != null) {
+      stopLocalBridge();
+    }
+    try {
+      _coreRepository.startLocalBridge(device.instanceId);
+      _bridgedDeviceId = device.instanceId;
+      _localBridgeSnapshot = _coreRepository.getLocalBridgeSnapshot();
+      _bridgeError = null;
+      _bridgePollTimer = Timer.periodic(
+        const Duration(milliseconds: 100),
+        (_) => _pollLocalBridge(),
+      );
+    } on Object catch (error) {
+      _bridgedDeviceId = null;
+      _localBridgeSnapshot = null;
+      _bridgeError = error;
+    }
+    notifyListeners();
+  }
+
+  void stopLocalBridge() {
+    _bridgePollTimer?.cancel();
+    _bridgePollTimer = null;
+    _coreRepository.stopLocalBridge();
+    _bridgedDeviceId = null;
+    _localBridgeSnapshot = null;
+    notifyListeners();
+  }
+
+  void _pollLocalBridge() {
+    try {
+      final snapshot = _coreRepository.getLocalBridgeSnapshot();
+      _localBridgeSnapshot = snapshot;
+      if (snapshot.state == 'disconnected' || snapshot.state == 'faulted') {
+        _bridgePollTimer?.cancel();
+        _bridgePollTimer = null;
+      }
+      _bridgeError = null;
+    } on Object catch (error) {
+      _bridgeError = error;
+      _bridgePollTimer?.cancel();
+      _bridgePollTimer = null;
+    }
+    notifyListeners();
+  }
+
   @override
   void dispose() {
     _capturePollTimer?.cancel();
+    _bridgePollTimer?.cancel();
     _coreRepository.dispose();
     super.dispose();
   }

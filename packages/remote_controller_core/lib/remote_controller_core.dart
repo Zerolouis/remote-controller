@@ -6,3 +6,4 @@ library;
 export 'src/gamepad_state.dart';
 export 'src/native_core.dart';
 export 'src/sdl_input.dart';
+export 'src/vigem_bridge.dart';

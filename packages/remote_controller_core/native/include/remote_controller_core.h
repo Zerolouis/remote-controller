@@ -22,6 +22,7 @@ extern "C" {
 
 typedef struct rc_session rc_session;
 typedef struct rc_input_capture rc_input_capture;
+typedef struct rc_local_controller_bridge rc_local_controller_bridge;
 
 typedef int32_t rc_result;
 
@@ -117,6 +118,26 @@ typedef struct rc_input_capture_snapshot_v1 {
   int16_t right_stick_y_max;
 } rc_input_capture_snapshot_v1;
 
+typedef struct rc_vigem_runtime_info_v1 {
+  uint32_t struct_size;
+  uint32_t available;
+  uint32_t result_code;
+  uint32_t reserved;
+  char error[RC_ERROR_MESSAGE_CAPACITY];
+} rc_vigem_runtime_info_v1;
+
+typedef struct rc_local_bridge_snapshot_v1 {
+  uint32_t struct_size;
+  uint32_t state;
+  uint64_t sample_count;
+  uint64_t timestamp_us;
+  rc_gamepad_state_v1 current_state;
+  uint64_t rumble_count;
+  uint16_t low_frequency_motor;
+  uint16_t high_frequency_motor;
+  uint32_t reserved;
+} rc_local_bridge_snapshot_v1;
+
 // ABI version for the exported C interface. Increase only for breaking changes.
 RC_API uint32_t rc_get_abi_version(void);
 
@@ -143,6 +164,21 @@ RC_API rc_result rc_input_capture_get_snapshot(
     rc_input_capture_snapshot_v1* out_snapshot);
 RC_API rc_result rc_input_capture_stop(rc_input_capture* capture);
 RC_API void rc_input_capture_destroy(rc_input_capture* capture);
+
+// Probes whether a compatible ViGEmBus driver can be opened.
+RC_API rc_result rc_vigem_get_runtime_info(
+    rc_vigem_runtime_info_v1* out_runtime_info);
+
+// Native-only SDL -> ViGEm diagnostic bridge. It does not enable HidHide and
+// must not be used as the production network session ABI.
+RC_API rc_result rc_local_bridge_create(
+    uint32_t instance_id, rc_local_controller_bridge** out_bridge);
+RC_API rc_result rc_local_bridge_start(rc_local_controller_bridge* bridge);
+RC_API rc_result rc_local_bridge_get_snapshot(
+    rc_local_controller_bridge* bridge,
+    rc_local_bridge_snapshot_v1* out_snapshot);
+RC_API rc_result rc_local_bridge_stop(rc_local_controller_bridge* bridge);
+RC_API void rc_local_bridge_destroy(rc_local_controller_bridge* bridge);
 
 // Creates a native-only loopback session used to validate the common input
 // pipeline before hardware and network backends are attached.

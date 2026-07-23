@@ -9,6 +9,7 @@ void main() {
     expect(RemoteControllerCore.abiVersion, 1);
     expect(RemoteControllerCore.buildInfo, contains('protocol=1'));
     expect(RemoteControllerCore.buildInfo, contains('sdl3'));
+    expect(RemoteControllerCore.buildInfo, contains('vigem-x360'));
     expect(RemoteControllerCore.buildInfo, contains('loopback'));
   });
 
@@ -41,6 +42,31 @@ void main() {
       ),
     );
     expect(capture.snapshot().state, NativeInputCaptureState.faulted);
+  });
+
+  test('ViGEmBus probe is safe and a failed local bridge cleans up', () {
+    final runtime = VigemController.runtimeInfo;
+    expect(runtime.resultCode, isNonNegative);
+    expect(runtime.error.isEmpty, runtime.available);
+
+    if (!runtime.available) {
+      expect(runtime.error, isNotEmpty);
+      return;
+    }
+
+    final bridge = VigemController.createLocalBridge(0xffffffff);
+    addTearDown(bridge.close);
+    expect(
+      bridge.start,
+      throwsA(
+        isA<NativeCoreException>().having(
+          (error) => error.resultCode,
+          'resultCode',
+          4,
+        ),
+      ),
+    );
+    expect(bridge.snapshot().state, LocalBridgeState.faulted);
   });
 
   test('loopback preserves full raw state and rejects stale sequences', () async {

@@ -5,6 +5,7 @@ import 'package:code_assets/code_assets.dart';
 import 'package:hooks/hooks.dart';
 import 'package:remote_controller_core/src/c_library.dart';
 import 'package:remote_controller_core/src/sdl_dependency.dart';
+import 'package:remote_controller_core/src/vigem_dependency.dart';
 
 Future<void> main(List<String> arguments) async {
   await build(arguments, (input, output) async {
@@ -23,8 +24,14 @@ Future<void> main(List<String> arguments) async {
       targetArchitecture: input.config.code.targetArchitecture,
       localSdkPath: input.userDefines['sdl_sdk_path'] as String?,
     );
+    final vigemClient = await prepareVigemClientSource(
+      outputDirectory: input.outputDirectory,
+      localSourcePath: input.userDefines['vigem_source_path'] as String?,
+    );
     final remoteControllerLibrary = createRemoteControllerLibrary(
       sdlIncludeDirectory: sdlSdk.includeDirectory.path,
+      vigemIncludeDirectory: vigemClient.includeDirectory.path,
+      vigemSourceFile: vigemClient.sourceFile.path,
     );
 
     await remoteControllerLibrary.build(
@@ -44,5 +51,8 @@ Future<void> main(List<String> arguments) async {
       ),
     );
     output.dependencies.add(sdlSdk.runtimeLibrary.uri);
+    for (final dependency in vigemClient.dependencies) {
+      output.dependencies.add(dependency.uri);
+    }
   });
 }

@@ -32,6 +32,8 @@ class SdlInputBackend final : public InputBackend {
   std::vector<InputDeviceInfo> EnumerateDevices() override;
   bool Open(const std::string& device_id, StateCallback state_callback,
             DisconnectCallback disconnect_callback) override;
+  bool SetRumble(std::uint16_t low_frequency_motor,
+                 std::uint16_t high_frequency_motor) override;
   void Close() noexcept override;
 
  private:
@@ -43,6 +45,8 @@ class SdlInputBackend final : public InputBackend {
   DisconnectCallback disconnect_callback_;
   std::thread poll_thread_;
   std::atomic_bool stop_requested_{false};
+  std::atomic_uint32_t pending_rumble_{};
+  std::atomic_uint64_t rumble_generation_{};
 };
 
 }  // namespace remote_controller::backends

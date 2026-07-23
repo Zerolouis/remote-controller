@@ -7,7 +7,7 @@ This repository contains original compatibility-oriented implementation plus sma
 | LizardByte/Sunshine | `93fc98394f4edd492e21d25b5833d29cef4123cc` | GPL-3.0 | Windows input injection, controller lifecycle and rumble design reference |
 | moonlight-stream/moonlight-qt | `2328713f4e7b8442e6bd49238b4eba27031a4d9f` | GPL-3.0 | Client controller polling/mapping reference |
 | moonlight-stream/moonlight-common-c | `703a06946861ff82cd33e5e13c59c1b017f7ded9` | GPL-3.0 | Button masks, controller packets and capability negotiation reference |
-| LizardByte/Virtual-Gamepad-Emulation-Client | `8d71f6740ffff4671cdadbca255ce528e3cd3fef` | MIT | Candidate virtual Xbox controller client API |
+| LizardByte/Virtual-Gamepad-Emulation-Client | `8d71f6740ffff4671cdadbca255ce528e3cd3fef` / upstream `1.21.222.0` | MIT | Compiled-in virtual Xbox 360 client implementation |
 | nefarius/ViGEmBus | 1.22.0 | BSD-3-Clause | External virtual gamepad driver; not redistributed |
 | nefarius/HidHide | `2b950fd9393e1644b4199f6eb4999e1720f0c6e9` | MIT | External device hiding driver and configuration contract; not redistributed |
 | libsdl-org/SDL | 3.4.12 / `f87239e71e42da91ca317a12eefb82cfbf3393eb` | zlib | Physical controller headers and bundled Windows runtime |
@@ -19,6 +19,17 @@ This repository contains original compatibility-oriented implementation plus sma
 |---|---|---|
 | moonlight-qt `app/streaming/input/gamepad.cpp` at `2328713f4e7b8442e6bd49238b4eba27031a4d9f` | `packages/remote_controller_core/native/src/sdl_input_backend.cpp` | Adapted the standard SDL button-to-Moonlight mask ordering to SDL 3 and this project's 32-bit full-state model; Qt, streaming, shortcuts, and audio/video code were not imported. |
 | Sunshine `src/platform/common.h` at `93fc98394f4edd492e21d25b5833d29cef4123cc` | `packages/remote_controller_core/native/include/controller_protocol.h` and `native/src/sdl_input_backend.cpp` | Reused GPL-3.0 controller button bit values, including paddles, touchpad, and misc extensions. |
+| Sunshine `src/platform/windows/input.cpp` at `93fc98394f4edd492e21d25b5833d29cef4123cc` | `packages/remote_controller_core/native/src/vigem_virtual_controller_backend.cpp` | Adapted the X360 button/report mapping, target lifecycle, and 8-bit-to-16-bit rumble semantics into the project's backend interface; DS4, touch, sensor, Boost, logging, and task-pool code were not imported. |
+
+## ViGEmClient source dependency
+
+- Source repository: `https://github.com/LizardByte/Virtual-Gamepad-Emulation-Client`
+- Pinned revision: `8d71f6740ffff4671cdadbca255ce528e3cd3fef`
+- Upstream package version: `1.21.222.0`
+- Commit archive SHA-256: `2fba3b63c3fdabe2664a30645b0e8ad79e52a11be628f91313d3cdbc698c121c`
+- Build behavior: the Native Assets hook verifies the commit archive and extracts only `LICENSE`, the four public/shared headers, two private headers, and `src/ViGEmClient.cpp`. The source is compiled statically into `remote_controller_core.dll`; no separate `ViGEmClient.dll` is redistributed. Offline builds can set the `vigem_source_path` hook user define to a checkout of the exact revision.
+- The extracted source files retain their upstream MIT notices, including `Copyright (c) 2017-2023 Nefarius Software Solutions e.U. and Contributors`.
+- License copy: `third_party/vigemclient/LICENSE.txt`.
 
 ## SDL binary dependency
 

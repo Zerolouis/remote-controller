@@ -9,6 +9,11 @@ const remoteControllerRecordUseMapping = <String, String>{
   'rc_input_capture_get_snapshot': 'rc_input_capture_get_snapshot',
   'rc_input_capture_start': 'rc_input_capture_start',
   'rc_input_capture_stop': 'rc_input_capture_stop',
+  'rc_local_bridge_create': 'rc_local_bridge_create',
+  'rc_local_bridge_destroy': 'rc_local_bridge_destroy',
+  'rc_local_bridge_get_snapshot': 'rc_local_bridge_get_snapshot',
+  'rc_local_bridge_start': 'rc_local_bridge_start',
+  'rc_local_bridge_stop': 'rc_local_bridge_stop',
   'rc_sdl_capture_create': 'rc_sdl_capture_create',
   'rc_sdl_enumerate_gamepads': 'rc_sdl_enumerate_gamepads',
   'rc_sdl_get_runtime_info': 'rc_sdl_get_runtime_info',
@@ -19,4 +24,5 @@ const remoteControllerRecordUseMapping = <String, String>{
   'rc_session_start': 'rc_session_start',
   'rc_session_stop': 'rc_session_stop',
   'rc_session_submit_state': 'rc_session_submit_state',
+  'rc_vigem_get_runtime_info': 'rc_vigem_get_runtime_info',
 };

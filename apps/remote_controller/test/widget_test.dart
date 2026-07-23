@@ -9,6 +9,7 @@ import 'package:remote_controller/domain/models/core_info.dart';
 import 'package:remote_controller/domain/models/input_capture_snapshot.dart';
 import 'package:remote_controller/domain/models/input_device.dart';
 import 'package:remote_controller/domain/models/loopback_diagnostic.dart';
+import 'package:remote_controller/domain/models/virtual_controller.dart';
 
 void main() {
   testWidgets('shows healthy native core and both roles', (tester) async {
@@ -82,6 +83,56 @@ void main() {
     await tester.pump();
     expect(find.byKey(const Key('input-capture-status')), findsNothing);
   });
+
+  testWidgets('shows an available ViGEmBus on the server dashboard', (
+    tester,
+  ) async {
+    await tester.binding.setSurfaceSize(const Size(1280, 900));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+
+    await tester.pumpWidget(
+      const RemoteControllerApp(coreRepository: _FakeCoreRepository()),
+    );
+    await tester.tap(find.byKey(const Key('server-role')));
+    await tester.pump();
+
+    expect(find.text('ViGEm 虚拟 Xbox 360 后端'), findsOneWidget);
+    expect(
+      find.text('ViGEmBus 已连接，可创建单个 X360 target 并接收双马达震动。'),
+      findsOneWidget,
+    );
+  });
+
+  testWidgets('starts and stops the local SDL to ViGEm bridge', (
+    tester,
+  ) async {
+    await tester.binding.setSurfaceSize(const Size(1280, 1400));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+
+    await tester.pumpWidget(
+      const RemoteControllerApp(coreRepository: _FakeCoreRepository()),
+    );
+    await tester.tap(find.byKey(const Key('client-role')));
+    await tester.pumpAndSettle();
+
+    final startButton = find.byKey(const Key('bridge-device-42'));
+    await tester.ensureVisible(startButton);
+    await tester.tap(startButton);
+    await tester.pump();
+
+    expect(find.byKey(const Key('stop-local-bridge')), findsOneWidget);
+    expect(find.textContaining('本机 SDL → ViGEm · 500 个样本'), findsOneWidget);
+    expect(find.text('65535'), findsOneWidget);
+    expect(find.textContaining('震动回调 3 次'), findsOneWidget);
+    expect(find.textContaining('低频 65535 · 高频 32768'), findsOneWidget);
+    expect(find.textContaining('HidHide 尚未启用'), findsOneWidget);
+
+    await tester.tap(find.byKey(const Key('stop-local-bridge')));
+    await tester.pump();
+
+    expect(find.byKey(const Key('local-bridge-status')), findsNothing);
+    expect(find.byKey(const Key('bridge-device-42')), findsOneWidget);
+  });
 }
 
 final class _FakeCoreRepository implements CoreRepository {
@@ -105,6 +156,13 @@ final class _FakeCoreRepository implements CoreRepository {
     available: true,
     version: '3.4.12',
     revision: 'test',
+    error: '',
+  );
+
+  @override
+  VirtualControllerRuntime getVirtualControllerRuntime() => const VirtualControllerRuntime(
+    available: true,
+    resultCode: 0,
     error: '',
   );
 
@@ -157,6 +215,28 @@ final class _FakeCoreRepository implements CoreRepository {
 
   @override
   void stopInputCapture() {}
+
+  @override
+  void startLocalBridge(int instanceId) {}
+
+  @override
+  LocalBridgeSnapshot getLocalBridgeSnapshot() => const LocalBridgeSnapshot(
+    state: 'running',
+    sampleCount: 500,
+    buttonFlags: 0x1000,
+    leftTrigger: 65535,
+    rightTrigger: 32768,
+    leftStickX: -32768,
+    leftStickY: 32767,
+    rightStickX: -1234,
+    rightStickY: 4321,
+    rumbleCount: 3,
+    lowFrequencyMotor: 65535,
+    highFrequencyMotor: 32768,
+  );
+
+  @override
+  void stopLocalBridge() {}
 
   @override
   void dispose() {}

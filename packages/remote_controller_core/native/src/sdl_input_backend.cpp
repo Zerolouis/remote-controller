@@ -102,7 +102,8 @@ void Api::Initialize() noexcept {
       Resolve(get_boolean_property, "SDL_GetBooleanProperty") &&
       Resolve(update_gamepads, "SDL_UpdateGamepads") &&
       Resolve(get_gamepad_button, "SDL_GetGamepadButton") &&
-      Resolve(get_gamepad_axis, "SDL_GetGamepadAxis");
+      Resolve(get_gamepad_axis, "SDL_GetGamepadAxis") &&
+      Resolve(rumble_gamepad, "SDL_RumbleGamepad");
   if (!resolved) {
     return;
   }
@@ -313,6 +314,22 @@ bool SdlInputBackend::Open(const std::string& device_id,
   return true;
 }
 
+bool SdlInputBackend::SetRumble(
+    const std::uint16_t low_frequency_motor,
+    const std::uint16_t high_frequency_motor) {
+  {
+    std::lock_guard lock(mutex_);
+    if (gamepad_ == nullptr) {
+      return false;
+    }
+  }
+  pending_rumble_ =
+      (static_cast<std::uint32_t>(high_frequency_motor) << 16U) |
+      low_frequency_motor;
+  ++rumble_generation_;
+  return true;
+}
+
 void SdlInputBackend::Close() noexcept {
   stop_requested_ = true;
   if (poll_thread_.joinable()) {
@@ -341,15 +358,23 @@ void SdlInputBackend::PollLoop() noexcept {
 
   auto& api = sdl::Api::Instance();
   auto next_poll = std::chrono::steady_clock::now();
+  std::uint64_t applied_rumble_generation = 0;
   while (!stop_requested_) {
     api.update_gamepads();
     if (!api.gamepad_connected(gamepad)) {
       if (!stop_requested_ && disconnect_callback) {
         disconnect_callback();
       }
-      return;
+      break;
     }
     state_callback(ReadState(api, gamepad));
+
+    const auto generation = rumble_generation_.load();
+    if (generation != applied_rumble_generation) {
+      const auto packed = pending_rumble_.load();
+      api.rumble_gamepad(gamepad, packed & 0xFFFFU, packed >> 16U, 1000U);
+      applied_rumble_generation = generation;
+    }
 
     next_poll += kPollingPeriod;
     const auto now = std::chrono::steady_clock::now();
@@ -358,6 +383,7 @@ void SdlInputBackend::PollLoop() noexcept {
     }
     std::this_thread::sleep_until(next_poll);
   }
+  api.rumble_gamepad(gamepad, 0, 0, 0);
 }
 
 }  // namespace remote_controller::backends

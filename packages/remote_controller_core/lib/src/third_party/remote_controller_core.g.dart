@@ -63,6 +63,43 @@ external void rc_input_capture_destroy(
   ffi.Pointer<rc_input_capture> capture,
 );
 
+@ffi.Native<ffi.Int32 Function(ffi.Pointer<rc_vigem_runtime_info_v1>)>()
+external int rc_vigem_get_runtime_info(
+  ffi.Pointer<rc_vigem_runtime_info_v1> out_runtime_info,
+);
+
+@ffi.Native<ffi.Int32 Function(ffi.Uint32, ffi.Pointer<ffi.Pointer<rc_local_controller_bridge>>)>()
+external int rc_local_bridge_create(
+  int instance_id,
+  ffi.Pointer<ffi.Pointer<rc_local_controller_bridge>> out_bridge,
+);
+
+@ffi.Native<ffi.Int32 Function(ffi.Pointer<rc_local_controller_bridge>)>()
+external int rc_local_bridge_start(
+  ffi.Pointer<rc_local_controller_bridge> bridge,
+);
+
+@ffi.Native<
+  ffi.Int32 Function(
+    ffi.Pointer<rc_local_controller_bridge>,
+    ffi.Pointer<rc_local_bridge_snapshot_v1>,
+  )
+>()
+external int rc_local_bridge_get_snapshot(
+  ffi.Pointer<rc_local_controller_bridge> bridge,
+  ffi.Pointer<rc_local_bridge_snapshot_v1> out_snapshot,
+);
+
+@ffi.Native<ffi.Int32 Function(ffi.Pointer<rc_local_controller_bridge>)>()
+external int rc_local_bridge_stop(
+  ffi.Pointer<rc_local_controller_bridge> bridge,
+);
+
+@ffi.Native<ffi.Void Function(ffi.Pointer<rc_local_controller_bridge>)>()
+external void rc_local_bridge_destroy(
+  ffi.Pointer<rc_local_controller_bridge> bridge,
+);
+
 @ffi.Native<ffi.Int32 Function(ffi.Uint32, ffi.Pointer<ffi.Pointer<rc_session>>)>()
 external int rc_session_create_loopback(
   int input_timeout_ms,
@@ -113,6 +150,8 @@ external void rc_session_destroy(
 final class rc_session extends ffi.Opaque {}
 
 final class rc_input_capture extends ffi.Opaque {}
+
+final class rc_local_controller_bridge extends ffi.Opaque {}
 
 final class rc_gamepad_state_v1 extends ffi.Struct {
   @ffi.Uint32()
@@ -273,4 +312,49 @@ final class rc_input_capture_snapshot_v1 extends ffi.Struct {
 
   @ffi.Int16()
   external int right_stick_y_max;
+}
+
+final class rc_vigem_runtime_info_v1 extends ffi.Struct {
+  @ffi.Uint32()
+  external int struct_size;
+
+  @ffi.Uint32()
+  external int available;
+
+  @ffi.Uint32()
+  external int result_code;
+
+  @ffi.Uint32()
+  external int reserved;
+
+  @ffi.Array.multi([256])
+  external ffi.Array<ffi.Char> error;
+}
+
+final class rc_local_bridge_snapshot_v1 extends ffi.Struct {
+  @ffi.Uint32()
+  external int struct_size;
+
+  @ffi.Uint32()
+  external int state;
+
+  @ffi.Uint64()
+  external int sample_count;
+
+  @ffi.Uint64()
+  external int timestamp_us;
+
+  external rc_gamepad_state_v1 current_state;
+
+  @ffi.Uint64()
+  external int rumble_count;
+
+  @ffi.Uint16()
+  external int low_frequency_motor;
+
+  @ffi.Uint16()
+  external int high_frequency_motor;
+
+  @ffi.Uint32()
+  external int reserved;
 }

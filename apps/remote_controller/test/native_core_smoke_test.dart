@@ -8,6 +8,7 @@ void main() {
   test('generated FFI bindings call the Native Assets library', () {
     expect(RemoteControllerCore.abiVersion, 1);
     expect(RemoteControllerCore.buildInfo, contains('protocol=1'));
+    expect(RemoteControllerCore.buildInfo, contains('vigem-x360'));
     expect(SdlInput.runtimeInfo.versionLabel, '3.4.12');
   });
 }
