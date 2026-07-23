@@ -21,6 +21,16 @@ final class VigemRuntimeInfo {
   final String error;
 }
 
+final class VigemInstallerLaunchResult {
+  const VigemInstallerLaunchResult({
+    required this.launched,
+    required this.win32Error,
+  });
+
+  final bool launched;
+  final int win32Error;
+}
+
 enum LocalBridgeState {
   created(0),
   running(1),
@@ -77,6 +87,25 @@ abstract final class VigemController {
       );
     } finally {
       calloc.free(info);
+    }
+  }
+
+  static VigemInstallerLaunchResult launchInstaller(String installerPath) {
+    final path = installerPath.toNativeUtf8();
+    final result = calloc<native.rc_vigem_installer_launch_result_v1>();
+    try {
+      result.ref.struct_size = sizeOf<native.rc_vigem_installer_launch_result_v1>();
+      _checkResult(
+        'rc_vigem_launch_installer',
+        native.rc_vigem_launch_installer(path.cast(), result),
+      );
+      return VigemInstallerLaunchResult(
+        launched: result.ref.launched != 0,
+        win32Error: result.ref.win32_error,
+      );
+    } finally {
+      calloc.free(result);
+      calloc.free(path);
     }
   }
 

@@ -312,6 +312,10 @@ class _InputDeviceCard extends StatelessWidget {
                 color: vigem?.available == true ? const Color(0xff5eead4) : const Color(0xffff8fa3),
               ),
             ),
+            _VigemInstallerControls(
+              viewModel: viewModel,
+              keyPrefix: 'client',
+            ),
             const SizedBox(height: 8),
             Text(
               runtime == null
@@ -522,11 +526,95 @@ class _VirtualControllerCard extends StatelessWidget {
                               '(0x${_hex(runtime.resultCode, 8)})',
                     key: const Key('server-vigem-status'),
                   ),
+                  _VigemInstallerControls(
+                    viewModel: viewModel,
+                    keyPrefix: 'server',
+                  ),
                 ],
               ),
             ),
           ],
         ),
+      ),
+    );
+  }
+}
+
+class _VigemInstallerControls extends StatelessWidget {
+  const _VigemInstallerControls({
+    required this.viewModel,
+    required this.keyPrefix,
+  });
+
+  final HomeViewModel viewModel;
+  final String keyPrefix;
+
+  @override
+  Widget build(BuildContext context) {
+    final unavailable = viewModel.virtualControllerRuntime?.available == false;
+    final status = viewModel.vigemInstallStatus;
+    final error = viewModel.vigemInstallError;
+    if (!unavailable && status == null && error == null) {
+      return const SizedBox.shrink();
+    }
+
+    return Padding(
+      padding: const EdgeInsets.only(top: 12),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          if (unavailable) ...[
+            const Text(
+              '可下载官方最终版 ViGEmBus 1.22.0。应用会校验固定 SHA-256，'
+              '随后显示标准 Windows UAC；不会静默安装或捆绑驱动。',
+              style: TextStyle(color: Colors.white70),
+            ),
+            const SizedBox(height: 10),
+            Wrap(
+              spacing: 10,
+              runSpacing: 10,
+              children: [
+                FilledButton.icon(
+                  key: Key('install-vigem-$keyPrefix'),
+                  onPressed: viewModel.isInstallingVigemBus ? null : viewModel.installVigemBus,
+                  icon: viewModel.isInstallingVigemBus
+                      ? const SizedBox.square(
+                          dimension: 16,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                      : const Icon(Icons.download_rounded),
+                  label: Text(
+                    viewModel.isInstallingVigemBus ? '正在准备安装器' : '安装 ViGEmBus 1.22.0',
+                  ),
+                ),
+                OutlinedButton.icon(
+                  key: Key('refresh-vigem-$keyPrefix'),
+                  onPressed: viewModel.isInstallingVigemBus
+                      ? null
+                      : viewModel.refreshVirtualControllerRuntime,
+                  icon: const Icon(Icons.refresh_rounded),
+                  label: const Text('重新检测'),
+                ),
+              ],
+            ),
+          ],
+          if (status != null) ...[
+            const SizedBox(height: 10),
+            Text(
+              status,
+              key: Key('vigem-install-status-$keyPrefix'),
+              style: const TextStyle(color: Color(0xfffde68a)),
+            ),
+          ],
+          if (error != null) ...[
+            const SizedBox(height: 10),
+            Text(
+              'ViGEmBus 安装失败：$error',
+              key: Key('vigem-install-error-$keyPrefix'),
+              style: const TextStyle(color: Color(0xffff8fa3)),
+            ),
+          ],
+        ],
       ),
     );
   }

@@ -25,4 +25,5 @@ const remoteControllerRecordUseMapping = <String, String>{
   'rc_session_stop': 'rc_session_stop',
   'rc_session_submit_state': 'rc_session_submit_state',
   'rc_vigem_get_runtime_info': 'rc_vigem_get_runtime_info',
+  'rc_vigem_launch_installer': 'rc_vigem_launch_installer',
 };

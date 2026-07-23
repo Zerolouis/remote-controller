@@ -13,6 +13,16 @@ final class VirtualControllerRuntime {
   final String error;
 }
 
+final class VigemBusInstallResult {
+  const VigemBusInstallResult({
+    required this.version,
+    required this.sourceUrl,
+  });
+
+  final String version;
+  final Uri sourceUrl;
+}
+
 final class LocalBridgeSnapshot {
   const LocalBridgeSnapshot({
     required this.state,

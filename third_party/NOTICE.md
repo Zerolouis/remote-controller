@@ -8,7 +8,7 @@ This repository contains original compatibility-oriented implementation plus sma
 | moonlight-stream/moonlight-qt | `2328713f4e7b8442e6bd49238b4eba27031a4d9f` | GPL-3.0 | Client controller polling/mapping reference |
 | moonlight-stream/moonlight-common-c | `703a06946861ff82cd33e5e13c59c1b017f7ded9` | GPL-3.0 | Button masks, controller packets and capability negotiation reference |
 | LizardByte/Virtual-Gamepad-Emulation-Client | `8d71f6740ffff4671cdadbca255ce528e3cd3fef` / upstream `1.21.222.0` | MIT | Compiled-in virtual Xbox 360 client implementation |
-| nefarius/ViGEmBus | 1.22.0 | BSD-3-Clause | External virtual gamepad driver; not redistributed |
+| nefarius/ViGEmBus | 1.22.0 / `v1.22.0` | BSD-3-Clause | External virtual gamepad driver; downloaded from the official release only after explicit user action, never bundled |
 | nefarius/HidHide | `2b950fd9393e1644b4199f6eb4999e1720f0c6e9` | MIT | External device hiding driver and configuration contract; not redistributed |
 | libsdl-org/SDL | 3.4.12 / `f87239e71e42da91ca317a12eefb82cfbf3393eb` | zlib | Physical controller headers and bundled Windows runtime |
 | Moonlight ENet fork | `aca87840b57f045a1f7f9299e4b1b9b8e2a5e2f1` | MIT | Candidate reliable UDP transport reference |
@@ -30,6 +30,17 @@ This repository contains original compatibility-oriented implementation plus sma
 - Build behavior: the Native Assets hook verifies the commit archive and extracts only `LICENSE`, the four public/shared headers, two private headers, and `src/ViGEmClient.cpp`. The source is compiled statically into `remote_controller_core.dll`; no separate `ViGEmClient.dll` is redistributed. Offline builds can set the `vigem_source_path` hook user define to a checkout of the exact revision.
 - The extracted source files retain their upstream MIT notices, including `Copyright (c) 2017-2023 Nefarius Software Solutions e.U. and Contributors`.
 - License copy: `third_party/vigemclient/LICENSE.txt`.
+
+## ViGEmBus runtime installer
+
+- Official release: `https://github.com/nefarius/ViGEmBus/releases/tag/v1.22.0`
+- Installer asset: `ViGEmBus_1.22.0_x64_x86_arm64.exe`
+- Direct URL: `https://github.com/nefarius/ViGEmBus/releases/download/v1.22.0/ViGEmBus_1.22.0_x64_x86_arm64.exe`
+- Exact size: `6,278,576` bytes
+- SHA-256: `89220a7865076b342892f98865f3499fb7c4cfd673159e89d352c360fd014c6a`
+- Runtime behavior: the application downloads this asset only after an explicit button press, rejects any size or SHA-256 mismatch, stores the verified file under the current user's temporary directory, then re-verifies the pinned size and SHA-256 with Windows BCrypt while holding the file against modification before launching the standard interactive installer through Windows `runas`/UAC. The installer is not committed to this repository or bundled in application releases.
+- Signature audit on 2026-07-23: Windows reported a valid Authenticode signature from `Nefarius Software Solutions e.U.` with certificate thumbprint `1F431092EC96A80B41AB5317F53AC02EA6F9B89B`.
+- License copy: `third_party/vigembus/LICENSE.txt`.
 
 ## SDL binary dependency
 

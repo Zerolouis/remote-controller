@@ -28,6 +28,7 @@ const _symbols = <String>{
   'rc_session_stop',
   'rc_session_submit_state',
   'rc_vigem_get_runtime_info',
+  'rc_vigem_launch_installer',
 };
 
 const _leafSymbols = <String>{'rc_get_abi_version', 'rc_get_build_info'};
@@ -64,6 +65,7 @@ void main() {
       'rc_sdl_runtime_info_v1',
       'rc_session_snapshot_v1',
       'rc_vigem_runtime_info_v1',
+      'rc_vigem_installer_launch_result_v1',
     }),
     output: Output(
       dartFile: bindings,

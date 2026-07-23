@@ -9,6 +9,7 @@ void main() {
     expect(RemoteControllerCore.abiVersion, 1);
     expect(RemoteControllerCore.buildInfo, contains('protocol=1'));
     expect(RemoteControllerCore.buildInfo, contains('vigem-x360'));
+    expect(RemoteControllerCore.buildInfo, contains('vigem-installer-launch'));
     expect(SdlInput.runtimeInfo.versionLabel, '3.4.12');
   });
 }

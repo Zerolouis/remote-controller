@@ -31,6 +31,9 @@ final class HomeViewModel extends ChangeNotifier {
   InputCaptureSnapshot? _inputCaptureSnapshot;
   Timer? _capturePollTimer;
   VirtualControllerRuntime? _virtualControllerRuntime;
+  bool _isInstallingVigemBus = false;
+  String? _vigemInstallStatus;
+  Object? _vigemInstallError;
   int? _bridgedDeviceId;
   LocalBridgeSnapshot? _localBridgeSnapshot;
   Object? _bridgeError;
@@ -49,6 +52,9 @@ final class HomeViewModel extends ChangeNotifier {
   int? get capturedDeviceId => _capturedDeviceId;
   InputCaptureSnapshot? get inputCaptureSnapshot => _inputCaptureSnapshot;
   VirtualControllerRuntime? get virtualControllerRuntime => _virtualControllerRuntime;
+  bool get isInstallingVigemBus => _isInstallingVigemBus;
+  String? get vigemInstallStatus => _vigemInstallStatus;
+  Object? get vigemInstallError => _vigemInstallError;
   int? get bridgedDeviceId => _bridgedDeviceId;
   LocalBridgeSnapshot? get localBridgeSnapshot => _localBridgeSnapshot;
   Object? get bridgeError => _bridgeError;
@@ -122,6 +128,45 @@ final class HomeViewModel extends ChangeNotifier {
       _isLoadingInputDevices = false;
       notifyListeners();
     }
+  }
+
+  Future<void> installVigemBus() async {
+    if (_isInstallingVigemBus || _virtualControllerRuntime?.available == true) {
+      return;
+    }
+    _isInstallingVigemBus = true;
+    _vigemInstallStatus = '正在下载并校验官方 ViGEmBus 安装器…';
+    _vigemInstallError = null;
+    notifyListeners();
+
+    try {
+      final result = await _coreRepository.installVigemBus();
+      _vigemInstallStatus =
+          'ViGEmBus ${result.version} 安装器已启动。完成安装后请重新检测；'
+          'Windows 可能要求重启。';
+    } on Object catch (error) {
+      _vigemInstallStatus = null;
+      _vigemInstallError = error;
+    } finally {
+      _isInstallingVigemBus = false;
+      notifyListeners();
+    }
+  }
+
+  void refreshVirtualControllerRuntime() {
+    try {
+      final hadInstallerLaunch = _vigemInstallStatus != null;
+      _virtualControllerRuntime = _coreRepository.getVirtualControllerRuntime();
+      _vigemInstallError = null;
+      if (_virtualControllerRuntime?.available == true) {
+        _vigemInstallStatus = 'ViGEmBus 已可用。';
+      } else if (hadInstallerLaunch) {
+        _vigemInstallStatus = '仍未检测到 ViGEmBus；请完成安装或重启 Windows 后再检测。';
+      }
+    } on Object catch (error) {
+      _vigemInstallError = error;
+    }
+    notifyListeners();
   }
 
   void startInputCapture(InputDevice device) {

@@ -126,6 +126,13 @@ typedef struct rc_vigem_runtime_info_v1 {
   char error[RC_ERROR_MESSAGE_CAPACITY];
 } rc_vigem_runtime_info_v1;
 
+typedef struct rc_vigem_installer_launch_result_v1 {
+  uint32_t struct_size;
+  uint32_t launched;
+  uint32_t win32_error;
+  uint32_t reserved;
+} rc_vigem_installer_launch_result_v1;
+
 typedef struct rc_local_bridge_snapshot_v1 {
   uint32_t struct_size;
   uint32_t state;
@@ -168,6 +175,11 @@ RC_API void rc_input_capture_destroy(rc_input_capture* capture);
 // Probes whether a compatible ViGEmBus driver can be opened.
 RC_API rc_result rc_vigem_get_runtime_info(
     rc_vigem_runtime_info_v1* out_runtime_info);
+
+// Verifies the pinned ViGEmBus installer and launches it through Windows UAC.
+RC_API rc_result rc_vigem_launch_installer(
+    const char* installer_path_utf8,
+    rc_vigem_installer_launch_result_v1* out_launch_result);
 
 // Native-only SDL -> ViGEm diagnostic bridge. It does not enable HidHide and
 // must not be used as the production network session ABI.

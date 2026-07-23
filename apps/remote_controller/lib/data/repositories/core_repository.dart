@@ -18,6 +18,8 @@ abstract interface class CoreRepository {
 
   VirtualControllerRuntime getVirtualControllerRuntime();
 
+  Future<VigemBusInstallResult> installVigemBus();
+
   void startInputCapture(int instanceId);
 
   InputCaptureSnapshot getInputCaptureSnapshot();

@@ -20,6 +20,7 @@ CLibrary createRemoteControllerLibrary({
     'native/src/remote_controller_core.cpp',
     'native/src/sdl_input_backend.cpp',
     'native/src/session.cpp',
+    'native/src/vigem_installer.cpp',
     'native/src/vigem_virtual_controller_backend.cpp',
     vigemSourceFile,
   ],
@@ -28,7 +29,7 @@ CLibrary createRemoteControllerLibrary({
     sdlIncludeDirectory,
     vigemIncludeDirectory,
   ],
-  libraries: const ['setupapi'],
+  libraries: const ['setupapi', 'shell32', 'bcrypt'],
   defines: const {
     'UNICODE': '1',
     '_UNICODE': '1',
@@ -43,5 +44,5 @@ CLibrary createRemoteControllerLibrary({
 final remoteControllerLinker = CLinker.library(
   name: 'remote_controller_core',
   assetName: remoteControllerAssetName,
-  libraries: const ['setupapi'],
+  libraries: const ['setupapi', 'shell32', 'bcrypt'],
 );

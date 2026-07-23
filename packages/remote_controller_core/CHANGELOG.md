@@ -1,3 +1,9 @@
+## 0.5.0
+
+- Add a generated C/Dart ABI for launching an authenticated ViGEmBus installer through Windows UAC.
+- Keep installer execution outside the Flutter UI isolate and return the Win32 launch result for diagnostics.
+- Re-verify the pinned installer with Windows BCrypt while holding it against modification, then use the Windows Shell API to show UAC.
+
 ## 0.4.0
 
 - Pin the reviewed Sunshine ViGEmClient fork and compile its minimal X360 client source through Native Assets.

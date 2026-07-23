@@ -1,6 +1,6 @@
 name: remote_controller_core
 description: Native Windows core and Dart FFI facade for Remote Controller.
-version: 0.4.0
+version: 0.5.0
 repository: https://github.com/Zerolouis/remote-controller
 
 environment:

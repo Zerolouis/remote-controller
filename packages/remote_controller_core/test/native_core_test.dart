@@ -1,6 +1,9 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // Copyright (C) 2026 Remote Controller contributors
 
+import 'dart:io';
+import 'dart:isolate';
+
 import 'package:remote_controller_core/remote_controller_core.dart';
 import 'package:test/test.dart';
 
@@ -10,6 +13,7 @@ void main() {
     expect(RemoteControllerCore.buildInfo, contains('protocol=1'));
     expect(RemoteControllerCore.buildInfo, contains('sdl3'));
     expect(RemoteControllerCore.buildInfo, contains('vigem-x360'));
+    expect(RemoteControllerCore.buildInfo, contains('vigem-installer-launch'));
     expect(RemoteControllerCore.buildInfo, contains('loopback'));
   });
 
@@ -67,6 +71,33 @@ void main() {
       ),
     );
     expect(bridge.snapshot().state, LocalBridgeState.faulted);
+  });
+
+  test('ViGEmBus installer launcher is safe from a background isolate', () async {
+    final result = await Isolate.run(
+      () => VigemController.launchInstaller(
+        r'Z:\remote-controller\missing\ViGEmBus-installer.exe',
+      ),
+    );
+
+    expect(result.launched, isFalse);
+    expect(result.win32Error, greaterThan(0));
+  });
+
+  test('native launcher rejects an installer that fails the pinned hash', () async {
+    final directory = await Directory.systemTemp.createTemp(
+      'remote-controller-native-installer-test-',
+    );
+    addTearDown(() => directory.delete(recursive: true));
+    final installer = File.fromUri(directory.uri.resolve('ViGEmBus.exe'));
+    await installer.writeAsBytes(const [1, 2, 3, 4], flush: true);
+
+    final result = await Isolate.run(
+      () => VigemController.launchInstaller(installer.path),
+    );
+
+    expect(result.launched, isFalse);
+    expect(result.win32Error, 13);
   });
 
   test('loopback preserves full raw state and rejects stale sequences', () async {

@@ -68,6 +68,14 @@ external int rc_vigem_get_runtime_info(
   ffi.Pointer<rc_vigem_runtime_info_v1> out_runtime_info,
 );
 
+@ffi.Native<
+  ffi.Int32 Function(ffi.Pointer<ffi.Char>, ffi.Pointer<rc_vigem_installer_launch_result_v1>)
+>()
+external int rc_vigem_launch_installer(
+  ffi.Pointer<ffi.Char> installer_path_utf8,
+  ffi.Pointer<rc_vigem_installer_launch_result_v1> out_launch_result,
+);
+
 @ffi.Native<ffi.Int32 Function(ffi.Uint32, ffi.Pointer<ffi.Pointer<rc_local_controller_bridge>>)>()
 external int rc_local_bridge_create(
   int instance_id,
@@ -329,6 +337,20 @@ final class rc_vigem_runtime_info_v1 extends ffi.Struct {
 
   @ffi.Array.multi([256])
   external ffi.Array<ffi.Char> error;
+}
+
+final class rc_vigem_installer_launch_result_v1 extends ffi.Struct {
+  @ffi.Uint32()
+  external int struct_size;
+
+  @ffi.Uint32()
+  external int launched;
+
+  @ffi.Uint32()
+  external int win32_error;
+
+  @ffi.Uint32()
+  external int reserved;
 }
 
 final class rc_local_bridge_snapshot_v1 extends ffi.Struct {

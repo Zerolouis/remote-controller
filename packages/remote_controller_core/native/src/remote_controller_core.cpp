@@ -16,14 +16,15 @@
 #include "input_capture.h"
 #include "local_controller_bridge.h"
 #include "session.h"
+#include "vigem_installer.h"
 
 namespace {
 
 constexpr std::uint32_t kAbiVersion = 1;
 constexpr char kBuildInfo[] =
-    "remote-controller-core/0.4.0; abi=1; protocol=1; "
+    "remote-controller-core/0.5.0; abi=1; protocol=1; "
     "backends=sdl3,vigem-x360,loopback,memory-virtual; "
-    "watchdog=100ms-default";
+    "features=vigem-installer-launch; watchdog=100ms-default";
 
 remote_controller::protocol::GamepadStateV1 ToNativeState(
     const rc_gamepad_state_v1& state) {
@@ -93,6 +94,7 @@ static_assert(sizeof(rc_sdl_runtime_info_v1) == 336);
 static_assert(sizeof(rc_input_device_info_v1) == 712);
 static_assert(sizeof(rc_input_capture_snapshot_v1) == 64);
 static_assert(sizeof(rc_vigem_runtime_info_v1) == 272);
+static_assert(sizeof(rc_vigem_installer_launch_result_v1) == 16);
 static_assert(sizeof(rc_local_bridge_snapshot_v1) == 56);
 
 extern "C" RC_API std::uint32_t rc_get_abi_version(void) { return kAbiVersion; }
@@ -249,6 +251,24 @@ extern "C" RC_API rc_result rc_vigem_get_runtime_info(
   out_runtime_info->available = runtime.available ? 1U : 0U;
   out_runtime_info->result_code = runtime.result_code;
   CopyUtf8(out_runtime_info->error, runtime.error);
+  return RC_RESULT_OK;
+}
+
+extern "C" RC_API rc_result rc_vigem_launch_installer(
+    const char* installer_path_utf8,
+    rc_vigem_installer_launch_result_v1* out_launch_result) {
+  if (installer_path_utf8 == nullptr || out_launch_result == nullptr ||
+      out_launch_result->struct_size !=
+          sizeof(rc_vigem_installer_launch_result_v1)) {
+    return RC_RESULT_INVALID_ARGUMENT;
+  }
+  const auto struct_size = out_launch_result->struct_size;
+  const auto result =
+      remote_controller::LaunchVigemInstaller(installer_path_utf8);
+  *out_launch_result = {};
+  out_launch_result->struct_size = struct_size;
+  out_launch_result->launched = result.launched ? 1U : 0U;
+  out_launch_result->win32_error = result.win32_error;
   return RC_RESULT_OK;
 }
 

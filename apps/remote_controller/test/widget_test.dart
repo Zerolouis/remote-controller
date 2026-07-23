@@ -16,7 +16,7 @@ void main() {
     await tester.binding.setSurfaceSize(const Size(1280, 800));
     addTearDown(() => tester.binding.setSurfaceSize(null));
 
-    await tester.pumpWidget(const RemoteControllerApp(coreRepository: _FakeCoreRepository()));
+    await tester.pumpWidget(RemoteControllerApp(coreRepository: _FakeCoreRepository()));
     await tester.pump();
 
     expect(find.text('Windows 原生核心已加载 · ABI 1'), findsOneWidget);
@@ -28,7 +28,7 @@ void main() {
     await tester.binding.setSurfaceSize(const Size(1280, 800));
     addTearDown(() => tester.binding.setSurfaceSize(null));
 
-    await tester.pumpWidget(const RemoteControllerApp(coreRepository: _FakeCoreRepository()));
+    await tester.pumpWidget(RemoteControllerApp(coreRepository: _FakeCoreRepository()));
     await tester.tap(find.byKey(const Key('server-role')));
     await tester.pump();
 
@@ -45,7 +45,7 @@ void main() {
     await tester.binding.setSurfaceSize(const Size(1280, 900));
     addTearDown(() => tester.binding.setSurfaceSize(null));
 
-    await tester.pumpWidget(const RemoteControllerApp(coreRepository: _FakeCoreRepository()));
+    await tester.pumpWidget(RemoteControllerApp(coreRepository: _FakeCoreRepository()));
     await tester.tap(find.byKey(const Key('client-role')));
     await tester.pump();
 
@@ -62,7 +62,7 @@ void main() {
     addTearDown(() => tester.binding.setSurfaceSize(null));
 
     await tester.pumpWidget(
-      const RemoteControllerApp(coreRepository: _FakeCoreRepository()),
+      RemoteControllerApp(coreRepository: _FakeCoreRepository()),
     );
     await tester.tap(find.byKey(const Key('client-role')));
     await tester.pumpAndSettle();
@@ -91,7 +91,7 @@ void main() {
     addTearDown(() => tester.binding.setSurfaceSize(null));
 
     await tester.pumpWidget(
-      const RemoteControllerApp(coreRepository: _FakeCoreRepository()),
+      RemoteControllerApp(coreRepository: _FakeCoreRepository()),
     );
     await tester.tap(find.byKey(const Key('server-role')));
     await tester.pump();
@@ -110,7 +110,7 @@ void main() {
     addTearDown(() => tester.binding.setSurfaceSize(null));
 
     await tester.pumpWidget(
-      const RemoteControllerApp(coreRepository: _FakeCoreRepository()),
+      RemoteControllerApp(coreRepository: _FakeCoreRepository()),
     );
     await tester.tap(find.byKey(const Key('client-role')));
     await tester.pumpAndSettle();
@@ -133,10 +133,42 @@ void main() {
     expect(find.byKey(const Key('local-bridge-status')), findsNothing);
     expect(find.byKey(const Key('bridge-device-42')), findsOneWidget);
   });
+
+  testWidgets('downloads ViGEmBus and refreshes driver availability', (
+    tester,
+  ) async {
+    await tester.binding.setSurfaceSize(const Size(1280, 1100));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    final repository = _FakeCoreRepository(vigemAvailable: false);
+
+    await tester.pumpWidget(RemoteControllerApp(coreRepository: repository));
+    await tester.tap(find.byKey(const Key('server-role')));
+    await tester.pump();
+
+    expect(find.byKey(const Key('install-vigem-server')), findsOneWidget);
+    expect(find.textContaining('校验固定 SHA-256'), findsOneWidget);
+
+    await tester.tap(find.byKey(const Key('install-vigem-server')));
+    await tester.pumpAndSettle();
+
+    expect(repository.installCallCount, 1);
+    expect(find.textContaining('安装器已启动'), findsOneWidget);
+
+    repository.vigemAvailable = true;
+    await tester.tap(find.byKey(const Key('refresh-vigem-server')));
+    await tester.pump();
+
+    expect(find.textContaining('ViGEmBus 已连接'), findsOneWidget);
+    expect(find.text('ViGEmBus 已可用。'), findsOneWidget);
+    expect(find.byKey(const Key('install-vigem-server')), findsNothing);
+  });
 }
 
 final class _FakeCoreRepository implements CoreRepository {
-  const _FakeCoreRepository();
+  _FakeCoreRepository({this.vigemAvailable = true});
+
+  bool vigemAvailable;
+  int installCallCount = 0;
 
   @override
   CoreInfo getCoreInfo() => const CoreInfo(
@@ -160,11 +192,22 @@ final class _FakeCoreRepository implements CoreRepository {
   );
 
   @override
-  VirtualControllerRuntime getVirtualControllerRuntime() => const VirtualControllerRuntime(
-    available: true,
-    resultCode: 0,
-    error: '',
+  VirtualControllerRuntime getVirtualControllerRuntime() => VirtualControllerRuntime(
+    available: vigemAvailable,
+    resultCode: vigemAvailable ? 0 : 0xe0000001,
+    error: vigemAvailable ? '' : 'ViGEmBus driver was not found.',
   );
+
+  @override
+  Future<VigemBusInstallResult> installVigemBus() async {
+    installCallCount += 1;
+    return VigemBusInstallResult(
+      version: '1.22.0',
+      sourceUrl: Uri.parse(
+        'https://github.com/nefarius/ViGEmBus/releases/tag/v1.22.0',
+      ),
+    );
+  }
 
   @override
   Future<List<InputDevice>> enumerateInputDevices() async => const [

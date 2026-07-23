@@ -3,6 +3,7 @@
 
 import 'package:remote_controller/data/repositories/core_repository.dart';
 import 'package:remote_controller/data/services/native_core_service.dart';
+import 'package:remote_controller/data/services/vigem_installer_service.dart';
 import 'package:remote_controller/domain/models/core_info.dart';
 import 'package:remote_controller/domain/models/input_capture_snapshot.dart';
 import 'package:remote_controller/domain/models/input_device.dart';
@@ -11,9 +12,10 @@ import 'package:remote_controller/domain/models/virtual_controller.dart' as doma
 import 'package:remote_controller_core/remote_controller_core.dart';
 
 final class NativeCoreRepository implements CoreRepository {
-  const NativeCoreRepository(this._service);
+  const NativeCoreRepository(this._service, this._vigemInstallerService);
 
   final NativeCoreService _service;
+  final VigemInstallerService _vigemInstallerService;
 
   @override
   CoreInfo getCoreInfo() => CoreInfo(
@@ -74,6 +76,15 @@ final class NativeCoreRepository implements CoreRepository {
       available: runtime.available,
       resultCode: runtime.resultCode,
       error: runtime.error,
+    );
+  }
+
+  @override
+  Future<domain.VigemBusInstallResult> installVigemBus() async {
+    final result = await _vigemInstallerService.downloadAndLaunch();
+    return domain.VigemBusInstallResult(
+      version: result.version,
+      sourceUrl: result.sourceUrl,
     );
   }
 
