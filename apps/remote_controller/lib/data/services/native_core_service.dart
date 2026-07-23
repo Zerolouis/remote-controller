@@ -7,6 +7,8 @@ import 'package:remote_controller_core/remote_controller_core.dart';
 final class NativeCoreService {
   SdlInputCapture? _inputCapture;
   LocalControllerBridge? _localBridge;
+  LanControllerClient? _lanClient;
+  LanControllerServer? _lanServer;
 
   int getAbiVersion() => RemoteControllerCore.abiVersion;
 
@@ -19,6 +21,7 @@ final class NativeCoreService {
   VigemRuntimeInfo getVirtualControllerRuntime() => VigemController.runtimeInfo;
 
   void startInputCapture(int instanceId) {
+    stopLanClient();
     stopLocalBridge();
     stopInputCapture();
     final capture = SdlInput.createCapture(instanceId);
@@ -45,6 +48,7 @@ final class NativeCoreService {
   }
 
   void startLocalBridge(int instanceId) {
+    stopLanClient();
     stopInputCapture();
     stopLocalBridge();
     final bridge = VigemController.createLocalBridge(instanceId);
@@ -70,9 +74,70 @@ final class NativeCoreService {
     _localBridge = null;
   }
 
+  void startLanClient(int instanceId, String serverAddress) {
+    stopInputCapture();
+    stopLocalBridge();
+    stopLanServer();
+    stopLanClient();
+    final client = LanController.createClient(
+      instanceId: instanceId,
+      serverAddress: serverAddress,
+    );
+    try {
+      client.start();
+      _lanClient = client;
+    } on Object {
+      client.close();
+      rethrow;
+    }
+  }
+
+  LanSessionSnapshot getLanClientStatus() {
+    final client = _lanClient;
+    if (client == null) {
+      throw StateError('No LAN controller client is active.');
+    }
+    return client.snapshot();
+  }
+
+  void stopLanClient() {
+    _lanClient?.close();
+    _lanClient = null;
+  }
+
+  void startLanServer() {
+    stopInputCapture();
+    stopLocalBridge();
+    stopLanClient();
+    stopLanServer();
+    final server = LanController.createServer();
+    try {
+      server.start();
+      _lanServer = server;
+    } on Object {
+      server.close();
+      rethrow;
+    }
+  }
+
+  LanSessionSnapshot getLanServerStatus() {
+    final server = _lanServer;
+    if (server == null) {
+      throw StateError('No LAN controller server is active.');
+    }
+    return server.snapshot();
+  }
+
+  void stopLanServer() {
+    _lanServer?.close();
+    _lanServer = null;
+  }
+
   void dispose() {
     stopInputCapture();
     stopLocalBridge();
+    stopLanClient();
+    stopLanServer();
   }
 
   Future<LoopbackDiagnosticData> runLoopbackDiagnostic() async {

@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:remote_controller/domain/models/app_role.dart';
 import 'package:remote_controller/domain/models/input_capture_snapshot.dart';
 import 'package:remote_controller/domain/models/input_device.dart';
+import 'package:remote_controller/domain/models/lan_session.dart';
 import 'package:remote_controller/domain/models/virtual_controller.dart';
 import 'package:remote_controller/ui/features/home/view_models/home_view_model.dart';
 
@@ -225,8 +226,8 @@ class _RoleDashboard extends StatelessWidget {
               const SizedBox(height: 8),
               Text(
                 isClient
-                    ? 'SDL 3 读取和 ViGEm 本机桥接已就绪；独占与网络尚未启用。'
-                    : 'ViGEm 虚拟 Xbox 360 后端已就绪；网络会话尚未启用。',
+                    ? 'SDL 3 读取、本机桥接和局域网诊断发送已就绪；HidHide 尚未启用。'
+                    : 'ViGEm 虚拟 Xbox 360 后端和局域网诊断接收已就绪。',
               ),
               if (isClient) ...[
                 const SizedBox(height: 20),
@@ -236,18 +237,14 @@ class _RoleDashboard extends StatelessWidget {
                 _VirtualControllerCard(viewModel: viewModel),
               ],
               const SizedBox(height: 20),
+              _LanDiagnosticCard(isClient: isClient, viewModel: viewModel),
+              const SizedBox(height: 20),
               _LoopbackDiagnosticCard(viewModel: viewModel),
               const SizedBox(height: 28),
               for (final step in steps) ...[
                 _SetupStep(number: step.$1, title: step.$2, description: step.$3),
                 const SizedBox(height: 14),
               ],
-              const SizedBox(height: 16),
-              FilledButton.icon(
-                onPressed: null,
-                icon: Icon(isClient ? Icons.link_rounded : Icons.power_settings_new_rounded),
-                label: Text(isClient ? '开始连接（待实现）' : '启动服务（待实现）'),
-              ),
             ],
           ),
         ),
@@ -378,10 +375,12 @@ class _InputDeviceTile extends StatelessWidget {
   Widget build(BuildContext context) {
     final captureActive = viewModel.capturedDeviceId == device.instanceId;
     final bridgeActive = viewModel.bridgedDeviceId == device.instanceId;
-    final active = captureActive || bridgeActive;
+    final lanActive = viewModel.lanClientDeviceId == device.instanceId;
+    final active = captureActive || bridgeActive || lanActive;
     final anotherActive =
         (viewModel.capturedDeviceId != null && !captureActive) ||
-        (viewModel.bridgedDeviceId != null && !bridgeActive);
+        (viewModel.bridgedDeviceId != null && !bridgeActive) ||
+        (viewModel.lanClientDeviceId != null && !lanActive);
     return DecoratedBox(
       key: Key('input-device-${device.instanceId}'),
       decoration: BoxDecoration(
@@ -452,7 +451,7 @@ class _InputDeviceTile extends StatelessWidget {
                   key: Key(
                     captureActive ? 'stop-input-capture' : 'capture-device-${device.instanceId}',
                   ),
-                  onPressed: anotherActive || bridgeActive
+                  onPressed: anotherActive || bridgeActive || lanActive
                       ? null
                       : captureActive
                       ? viewModel.stopInputCapture
@@ -469,6 +468,7 @@ class _InputDeviceTile extends StatelessWidget {
                   onPressed:
                       anotherActive ||
                           captureActive ||
+                          lanActive ||
                           viewModel.virtualControllerRuntime?.available != true
                       ? null
                       : bridgeActive
@@ -479,8 +479,202 @@ class _InputDeviceTile extends StatelessWidget {
                   ),
                   label: Text(bridgeActive ? '停止本机桥接' : '桥接到虚拟 X360'),
                 ),
+                FilledButton.icon(
+                  key: Key(
+                    lanActive ? 'stop-lan-client' : 'lan-client-device-${device.instanceId}',
+                  ),
+                  onPressed: anotherActive || captureActive || bridgeActive
+                      ? null
+                      : lanActive
+                      ? viewModel.stopLanClient
+                      : () => viewModel.startLanClient(device),
+                  icon: Icon(
+                    lanActive ? Icons.stop_rounded : Icons.wifi_tethering_rounded,
+                  ),
+                  label: Text(lanActive ? '停止局域网发送' : '发送到电脑'),
+                ),
               ],
             ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _LanDiagnosticCard extends StatelessWidget {
+  const _LanDiagnosticCard({
+    required this.isClient,
+    required this.viewModel,
+  });
+
+  final bool isClient;
+  final HomeViewModel viewModel;
+
+  @override
+  Widget build(BuildContext context) {
+    final status = viewModel.lanSessionStatus;
+    final active = isClient ? viewModel.lanClientDeviceId != null : viewModel.lanServerActive;
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(18),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Icon(
+                  Icons.lan_rounded,
+                  color: status?.connected == true
+                      ? const Color(0xff5eead4)
+                      : const Color(0xfffbbf24),
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Text(
+                    '局域网 Client–Server 诊断链路',
+                    style: Theme.of(context).textTheme.titleMedium,
+                  ),
+                ),
+                const Chip(label: Text('未加密诊断版')),
+              ],
+            ),
+            const SizedBox(height: 10),
+            const Text(
+              'TCP 26760 负责握手、心跳、停止和震动；UDP 26760 发送 64 字节完整状态。'
+              '当前没有配对或 AEAD，只能在可信局域网测试。',
+              style: TextStyle(color: Color(0xfffde68a)),
+            ),
+            const SizedBox(height: 14),
+            if (isClient) ...[
+              TextFormField(
+                key: const Key('lan-server-address'),
+                initialValue: viewModel.serverAddress,
+                enabled: !active,
+                onChanged: viewModel.setServerAddress,
+                decoration: const InputDecoration(
+                  labelText: '电脑 IPv4 地址或主机名',
+                  hintText: '例如 192.168.1.20',
+                  prefixIcon: Icon(Icons.dns_rounded),
+                  border: OutlineInputBorder(),
+                ),
+              ),
+              const SizedBox(height: 10),
+              Text(
+                active ? '已使用所选手柄启动发送；请在设备卡片中停止。' : '填写电脑地址后，在上方目标手柄卡片点击“发送到电脑”。',
+                style: const TextStyle(color: Colors.white70),
+              ),
+              const SizedBox(height: 8),
+              const Text(
+                'HidHide 尚未启用，本机程序仍可能同时收到实体手柄输入。',
+                style: TextStyle(color: Color(0xffffb4c0)),
+              ),
+            ] else ...[
+              FilledButton.icon(
+                key: Key(active ? 'stop-lan-server' : 'start-lan-server'),
+                onPressed: viewModel.virtualControllerRuntime?.available != true
+                    ? null
+                    : active
+                    ? viewModel.stopLanServer
+                    : viewModel.startLanServer,
+                icon: Icon(
+                  active ? Icons.stop_rounded : Icons.power_settings_new_rounded,
+                ),
+                label: Text(active ? '停止局域网服务' : '监听 TCP/UDP 26760'),
+              ),
+              const SizedBox(height: 10),
+              const Text(
+                '首次监听时 Windows 防火墙可能要求允许专用网络访问。服务端一次只接受一个客户端。',
+                style: TextStyle(color: Colors.white70),
+              ),
+            ],
+            if (viewModel.lanSessionError != null) ...[
+              const SizedBox(height: 12),
+              Text(
+                '局域网会话错误：${viewModel.lanSessionError}',
+                key: const Key('lan-session-error'),
+                style: const TextStyle(color: Color(0xffff8fa3)),
+              ),
+            ],
+            if (status != null) ...[
+              const SizedBox(height: 14),
+              _LanStatusPanel(status: status, isClient: isClient),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _LanStatusPanel extends StatelessWidget {
+  const _LanStatusPanel({required this.status, required this.isClient});
+
+  final LanSessionStatus status;
+  final bool isClient;
+
+  @override
+  Widget build(BuildContext context) {
+    final connectionLabel = status.connected
+        ? '已连接 ${status.peerAddress}'
+        : status.state == 'running'
+        ? (isClient ? '正在连接电脑…' : '正在等待客户端…')
+        : status.state;
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: const Color(0xff071a19),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+          color: status.connected ? const Color(0xff2dd4bf) : const Color(0xfffbbf24),
+        ),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(14),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              connectionLabel,
+              key: const Key('lan-session-status'),
+              style: Theme.of(context).textTheme.titleSmall,
+            ),
+            const SizedBox(height: 8),
+            Text(
+              '发送 ${status.sentPacketCount} · 接收 ${status.receivedPacketCount} · '
+              '丢弃 ${status.droppedPacketCount} · 序列 ${status.latestSequence} · '
+              '安全归零 ${status.neutralizationCount}',
+              style: const TextStyle(fontFamily: 'Consolas'),
+            ),
+            const SizedBox(height: 10),
+            Wrap(
+              spacing: 10,
+              runSpacing: 10,
+              children: [
+                _RawMetric(
+                  label: 'Buttons',
+                  value: '0x${_hex(status.buttonFlags, 8)}',
+                ),
+                _RawMetric(label: 'LT', value: '${status.leftTrigger}'),
+                _RawMetric(label: 'RT', value: '${status.rightTrigger}'),
+                _RawMetric(label: 'LX', value: '${status.leftStickX}'),
+                _RawMetric(label: 'LY', value: '${status.leftStickY}'),
+                _RawMetric(label: 'RX', value: '${status.rightStickX}'),
+                _RawMetric(label: 'RY', value: '${status.rightStickY}'),
+              ],
+            ),
+            const SizedBox(height: 10),
+            Text(
+              '震动 ${status.rumbleCount} 次 · '
+              '低频 ${status.lowFrequencyMotor} · 高频 ${status.highFrequencyMotor}',
+              style: const TextStyle(fontFamily: 'Consolas'),
+            ),
+            if (status.error.isNotEmpty) ...[
+              const SizedBox(height: 8),
+              Text(
+                '${status.error} (Winsock ${status.lastError})',
+                style: const TextStyle(color: Color(0xffff8fa3)),
+              ),
+            ],
           ],
         ),
       ),

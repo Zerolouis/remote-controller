@@ -17,11 +17,23 @@ inline constexpr std::uint16_t kInputHeaderSize = 32;
 inline constexpr std::uint16_t kControlPort = 26760;
 inline constexpr std::uint16_t kInputPort = 26760;
 inline constexpr std::uint16_t kDiscoveryPort = 26761;
+inline constexpr std::uint16_t kInputFlagDiagnosticPlaintext = 0x0001;
+inline constexpr std::uint32_t kControlMagic = 0x31434352;  // "RCC1" in LE.
+inline constexpr std::uint16_t kControlFrameSize = 32;
 
 enum class MessageType : std::uint8_t {
   kFullState = 1,
   kRumble = 2,
   kHeartbeat = 3,
+};
+
+enum class ControlMessageType : std::uint8_t {
+  kHello = 1,
+  kHelloAck = 2,
+  kHeartbeat = 3,
+  kRumble = 4,
+  kStop = 5,
+  kError = 6,
 };
 
 enum ButtonFlag : std::uint32_t {
@@ -79,11 +91,28 @@ struct InputDatagramV1 {
   std::array<std::uint8_t, 16> authentication_tag;
 };
 
+// Temporary M2 diagnostic control frame. It deliberately has no encryption
+// and must not be accepted by the future paired production transport.
+struct DiagnosticControlFrameV1 {
+  std::uint32_t magic;
+  std::uint8_t version;
+  std::uint8_t message_type;
+  std::uint16_t flags;
+  std::uint16_t frame_length;
+  std::uint16_t reserved;
+  std::uint32_t session_id;
+  std::uint64_t sequence;
+  std::uint16_t low_frequency_motor;
+  std::uint16_t high_frequency_motor;
+  std::uint32_t capabilities;
+};
+
 #pragma pack(pop)
 
 static_assert(sizeof(InputPacketHeaderV1) == kInputHeaderSize);
 static_assert(sizeof(GamepadStateV1) == 16);
 static_assert(sizeof(InputDatagramV1) == kInputDatagramSize);
+static_assert(sizeof(DiagnosticControlFrameV1) == kControlFrameSize);
 static_assert(std::is_trivially_copyable_v<GamepadStateV1>);
 
 }  // namespace remote_controller::protocol

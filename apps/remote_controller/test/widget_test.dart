@@ -8,6 +8,7 @@ import 'package:remote_controller/data/repositories/core_repository.dart';
 import 'package:remote_controller/domain/models/core_info.dart';
 import 'package:remote_controller/domain/models/input_capture_snapshot.dart';
 import 'package:remote_controller/domain/models/input_device.dart';
+import 'package:remote_controller/domain/models/lan_session.dart';
 import 'package:remote_controller/domain/models/loopback_diagnostic.dart';
 import 'package:remote_controller/domain/models/virtual_controller.dart';
 
@@ -33,7 +34,7 @@ void main() {
     await tester.pump();
 
     expect(find.text('检查驱动'), findsOneWidget);
-    expect(find.text('启动服务（待实现）'), findsOneWidget);
+    expect(find.byKey(const Key('start-lan-server')), findsOneWidget);
 
     await tester.tap(find.byKey(const Key('back-to-roles')));
     await tester.pump();
@@ -50,7 +51,11 @@ void main() {
     await tester.pump();
 
     expect(find.textContaining('尚未运行'), findsOneWidget);
-    await tester.tap(find.byKey(const Key('run-loopback-diagnostic')));
+    final diagnosticButton = find.byKey(
+      const Key('run-loopback-diagnostic'),
+    );
+    await tester.ensureVisible(diagnosticButton);
+    await tester.tap(diagnosticButton);
     await tester.pumpAndSettle();
 
     expect(find.textContaining('自检通过'), findsOneWidget);
@@ -125,7 +130,10 @@ void main() {
     expect(find.text('65535'), findsOneWidget);
     expect(find.textContaining('震动回调 3 次'), findsOneWidget);
     expect(find.textContaining('低频 65535 · 高频 32768'), findsOneWidget);
-    expect(find.textContaining('HidHide 尚未启用'), findsOneWidget);
+    expect(
+      find.text('HidHide 尚未启用：实体和虚拟手柄会同时可见，游戏中可能产生双输入。'),
+      findsOneWidget,
+    );
 
     await tester.tap(find.byKey(const Key('stop-local-bridge')));
     await tester.pump();
@@ -162,6 +170,50 @@ void main() {
     expect(find.text('ViGEmBus 已可用。'), findsOneWidget);
     expect(find.byKey(const Key('install-vigem-server')), findsNothing);
   });
+
+  testWidgets('starts the LAN server diagnostic listener', (tester) async {
+    await tester.binding.setSurfaceSize(const Size(1280, 1200));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    final repository = _FakeCoreRepository();
+
+    await tester.pumpWidget(RemoteControllerApp(coreRepository: repository));
+    await tester.tap(find.byKey(const Key('server-role')));
+    await tester.pump();
+
+    await tester.tap(find.byKey(const Key('start-lan-server')));
+    await tester.pump();
+
+    expect(repository.lanServerStarted, isTrue);
+    expect(find.byKey(const Key('stop-lan-server')), findsOneWidget);
+    expect(find.textContaining('已连接 192.168.1.40'), findsOneWidget);
+    expect(find.textContaining('接收 640'), findsOneWidget);
+  });
+
+  testWidgets('starts LAN client transmission for the selected gamepad', (
+    tester,
+  ) async {
+    await tester.binding.setSurfaceSize(const Size(1280, 1600));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    final repository = _FakeCoreRepository();
+
+    await tester.pumpWidget(RemoteControllerApp(coreRepository: repository));
+    await tester.tap(find.byKey(const Key('client-role')));
+    await tester.pumpAndSettle();
+
+    await tester.enterText(
+      find.byKey(const Key('lan-server-address')),
+      '192.168.1.20',
+    );
+    final start = find.byKey(const Key('lan-client-device-42'));
+    await tester.ensureVisible(start);
+    await tester.tap(start);
+    await tester.pump();
+
+    expect(repository.lanClientStarted, isTrue);
+    expect(repository.lastServerAddress, '192.168.1.20');
+    expect(find.byKey(const Key('stop-lan-client')), findsOneWidget);
+    expect(find.textContaining('发送 640'), findsOneWidget);
+  });
 }
 
 final class _FakeCoreRepository implements CoreRepository {
@@ -169,6 +221,9 @@ final class _FakeCoreRepository implements CoreRepository {
 
   bool vigemAvailable;
   int installCallCount = 0;
+  bool lanClientStarted = false;
+  bool lanServerStarted = false;
+  String? lastServerAddress;
 
   @override
   CoreInfo getCoreInfo() => const CoreInfo(
@@ -282,5 +337,55 @@ final class _FakeCoreRepository implements CoreRepository {
   void stopLocalBridge() {}
 
   @override
+  void startLanClient(int instanceId, String serverAddress) {
+    lanClientStarted = true;
+    lastServerAddress = serverAddress;
+  }
+
+  @override
+  LanSessionStatus getLanClientStatus() => _lanStatus(sent: 640, received: 0);
+
+  @override
+  void stopLanClient() {
+    lanClientStarted = false;
+  }
+
+  @override
+  void startLanServer() {
+    lanServerStarted = true;
+  }
+
+  @override
+  LanSessionStatus getLanServerStatus() => _lanStatus(sent: 0, received: 640);
+
+  @override
+  void stopLanServer() {
+    lanServerStarted = false;
+  }
+
+  @override
   void dispose() {}
+
+  LanSessionStatus _lanStatus({required int sent, required int received}) => LanSessionStatus(
+    state: 'running',
+    connected: true,
+    sentPacketCount: sent,
+    receivedPacketCount: received,
+    droppedPacketCount: 2,
+    neutralizationCount: 1,
+    latestSequence: 640,
+    buttonFlags: 0x1000,
+    leftTrigger: 65535,
+    rightTrigger: 32768,
+    leftStickX: -32768,
+    leftStickY: 32767,
+    rightStickX: -1234,
+    rightStickY: 4321,
+    rumbleCount: 3,
+    lowFrequencyMotor: 65535,
+    highFrequencyMotor: 32768,
+    peerAddress: '192.168.1.40',
+    lastError: 0,
+    error: '',
+  );
 }

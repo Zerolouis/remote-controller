@@ -23,6 +23,8 @@ extern "C" {
 typedef struct rc_session rc_session;
 typedef struct rc_input_capture rc_input_capture;
 typedef struct rc_local_controller_bridge rc_local_controller_bridge;
+typedef struct rc_lan_controller_client rc_lan_controller_client;
+typedef struct rc_lan_controller_server rc_lan_controller_server;
 
 typedef int32_t rc_result;
 
@@ -145,6 +147,26 @@ typedef struct rc_local_bridge_snapshot_v1 {
   uint32_t reserved;
 } rc_local_bridge_snapshot_v1;
 
+typedef struct rc_lan_session_snapshot_v1 {
+  uint32_t struct_size;
+  uint32_t state;
+  uint32_t connected;
+  uint32_t reserved;
+  uint64_t sent_packet_count;
+  uint64_t received_packet_count;
+  uint64_t dropped_packet_count;
+  uint64_t neutralization_count;
+  uint64_t latest_sequence;
+  uint64_t last_input_timestamp_us;
+  uint64_t rumble_count;
+  rc_gamepad_state_v1 current_state;
+  uint16_t low_frequency_motor;
+  uint16_t high_frequency_motor;
+  uint32_t last_error;
+  char peer_address[64];
+  char error[RC_ERROR_MESSAGE_CAPACITY];
+} rc_lan_session_snapshot_v1;
+
 // ABI version for the exported C interface. Increase only for breaking changes.
 RC_API uint32_t rc_get_abi_version(void);
 
@@ -191,6 +213,28 @@ RC_API rc_result rc_local_bridge_get_snapshot(
     rc_local_bridge_snapshot_v1* out_snapshot);
 RC_API rc_result rc_local_bridge_stop(rc_local_controller_bridge* bridge);
 RC_API void rc_local_bridge_destroy(rc_local_controller_bridge* bridge);
+
+// Plaintext LAN diagnostic path used to validate the split Client/Server
+// controller chain before pairing and AEAD are enabled. Trusted LAN only.
+RC_API rc_result rc_lan_client_create(
+    uint32_t instance_id, const char* server_address_utf8, uint16_t port,
+    rc_lan_controller_client** out_client);
+RC_API rc_result rc_lan_client_start(rc_lan_controller_client* client);
+RC_API rc_result rc_lan_client_get_snapshot(
+    rc_lan_controller_client* client,
+    rc_lan_session_snapshot_v1* out_snapshot);
+RC_API rc_result rc_lan_client_stop(rc_lan_controller_client* client);
+RC_API void rc_lan_client_destroy(rc_lan_controller_client* client);
+
+RC_API rc_result rc_lan_server_create(
+    uint16_t port, uint32_t input_timeout_ms,
+    rc_lan_controller_server** out_server);
+RC_API rc_result rc_lan_server_start(rc_lan_controller_server* server);
+RC_API rc_result rc_lan_server_get_snapshot(
+    rc_lan_controller_server* server,
+    rc_lan_session_snapshot_v1* out_snapshot);
+RC_API rc_result rc_lan_server_stop(rc_lan_controller_server* server);
+RC_API void rc_lan_server_destroy(rc_lan_controller_server* server);
 
 // Creates a native-only loopback session used to validate the common input
 // pipeline before hardware and network backends are attached.

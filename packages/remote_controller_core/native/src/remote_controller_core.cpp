@@ -14,6 +14,7 @@
 #include "backends/vigem_virtual_controller_backend.h"
 #include "controller_protocol.h"
 #include "input_capture.h"
+#include "lan_controller_session.h"
 #include "local_controller_bridge.h"
 #include "session.h"
 #include "vigem_installer.h"
@@ -22,9 +23,10 @@ namespace {
 
 constexpr std::uint32_t kAbiVersion = 1;
 constexpr char kBuildInfo[] =
-    "remote-controller-core/0.5.0; abi=1; protocol=1; "
-    "backends=sdl3,vigem-x360,loopback,memory-virtual; "
-    "features=vigem-installer-launch; watchdog=100ms-default";
+    "remote-controller-core/0.6.0; abi=1; protocol=1; "
+    "backends=sdl3,vigem-x360,udp-lan,loopback,memory-virtual; "
+    "features=lan-diagnostic,vigem-installer-launch; "
+    "watchdog=100ms-default";
 
 remote_controller::protocol::GamepadStateV1 ToNativeState(
     const rc_gamepad_state_v1& state) {
@@ -54,6 +56,28 @@ void CopyUtf8(char (&destination)[Size], const std::string_view source) {
   const auto length = std::min(source.size(), Size - 1);
   std::memcpy(destination, source.data(), length);
   destination[length] = '\0';
+}
+
+void CopyLanSnapshot(const remote_controller::LanSessionSnapshot& source,
+                     rc_lan_session_snapshot_v1& destination) {
+  const auto struct_size = destination.struct_size;
+  destination = {};
+  destination.struct_size = struct_size;
+  destination.state = static_cast<std::uint32_t>(source.state);
+  destination.connected = source.connected ? 1U : 0U;
+  destination.sent_packet_count = source.sent_packet_count;
+  destination.received_packet_count = source.received_packet_count;
+  destination.dropped_packet_count = source.dropped_packet_count;
+  destination.neutralization_count = source.neutralization_count;
+  destination.latest_sequence = source.latest_sequence;
+  destination.last_input_timestamp_us = source.last_input_timestamp_us;
+  destination.rumble_count = source.rumble_count;
+  destination.current_state = ToAbiState(source.current_state);
+  destination.low_frequency_motor = source.low_frequency_motor;
+  destination.high_frequency_motor = source.high_frequency_motor;
+  destination.last_error = source.last_error;
+  CopyUtf8(destination.peer_address, source.peer_address);
+  CopyUtf8(destination.error, source.error);
 }
 
 }  // namespace
@@ -87,6 +111,33 @@ struct rc_local_controller_bridge {
   remote_controller::LocalControllerBridge implementation;
 };
 
+struct rc_lan_controller_client {
+  rc_lan_controller_client(const std::uint32_t instance_id,
+                           std::string server_address,
+                           const std::uint16_t port)
+      : implementation(
+            std::make_unique<remote_controller::backends::SdlInputBackend>(),
+            std::make_unique<remote_controller::backends::
+                                 UdpLanTransportBackend>(
+                std::move(server_address), port),
+            std::to_string(instance_id)) {}
+
+  remote_controller::LanControllerClient implementation;
+};
+
+struct rc_lan_controller_server {
+  rc_lan_controller_server(const std::uint16_t port,
+                           const std::chrono::milliseconds input_timeout)
+      : implementation(
+            std::make_unique<remote_controller::backends::
+                                 UdpLanTransportBackend>(port),
+            std::make_unique<remote_controller::backends::
+                                 VigemVirtualControllerBackend>(),
+            input_timeout) {}
+
+  remote_controller::LanControllerServer implementation;
+};
+
 static_assert(sizeof(rc_gamepad_state_v1) ==
               sizeof(remote_controller::protocol::GamepadStateV1));
 static_assert(sizeof(rc_session_snapshot_v1) == 56);
@@ -96,6 +147,7 @@ static_assert(sizeof(rc_input_capture_snapshot_v1) == 64);
 static_assert(sizeof(rc_vigem_runtime_info_v1) == 272);
 static_assert(sizeof(rc_vigem_installer_launch_result_v1) == 16);
 static_assert(sizeof(rc_local_bridge_snapshot_v1) == 56);
+static_assert(sizeof(rc_lan_session_snapshot_v1) == 416);
 
 extern "C" RC_API std::uint32_t rc_get_abi_version(void) { return kAbiVersion; }
 
@@ -331,6 +383,108 @@ extern "C" RC_API rc_result rc_local_bridge_stop(
 extern "C" RC_API void rc_local_bridge_destroy(
     rc_local_controller_bridge* bridge) {
   delete bridge;
+}
+
+extern "C" RC_API rc_result rc_lan_client_create(
+    const std::uint32_t instance_id, const char* server_address_utf8,
+    const std::uint16_t port, rc_lan_controller_client** out_client) {
+  if (server_address_utf8 == nullptr || server_address_utf8[0] == '\0' ||
+      port == 0 || out_client == nullptr) {
+    return RC_RESULT_INVALID_ARGUMENT;
+  }
+  *out_client = nullptr;
+  if (!remote_controller::backends::SdlInputBackend::GetRuntimeInfo()
+           .available) {
+    return RC_RESULT_BACKEND_FAILURE;
+  }
+  auto client = new (std::nothrow)
+      rc_lan_controller_client(instance_id, server_address_utf8, port);
+  if (client == nullptr) {
+    return RC_RESULT_BACKEND_FAILURE;
+  }
+  *out_client = client;
+  return RC_RESULT_OK;
+}
+
+extern "C" RC_API rc_result rc_lan_client_start(
+    rc_lan_controller_client* client) {
+  if (client == nullptr) {
+    return RC_RESULT_INVALID_ARGUMENT;
+  }
+  return ToAbiResult(client->implementation.Start());
+}
+
+extern "C" RC_API rc_result rc_lan_client_get_snapshot(
+    rc_lan_controller_client* client,
+    rc_lan_session_snapshot_v1* out_snapshot) {
+  if (client == nullptr || out_snapshot == nullptr ||
+      out_snapshot->struct_size != sizeof(rc_lan_session_snapshot_v1)) {
+    return RC_RESULT_INVALID_ARGUMENT;
+  }
+  CopyLanSnapshot(client->implementation.Snapshot(), *out_snapshot);
+  return RC_RESULT_OK;
+}
+
+extern "C" RC_API rc_result rc_lan_client_stop(
+    rc_lan_controller_client* client) {
+  if (client == nullptr) {
+    return RC_RESULT_INVALID_ARGUMENT;
+  }
+  return ToAbiResult(client->implementation.Stop());
+}
+
+extern "C" RC_API void rc_lan_client_destroy(
+    rc_lan_controller_client* client) {
+  delete client;
+}
+
+extern "C" RC_API rc_result rc_lan_server_create(
+    const std::uint16_t port, const std::uint32_t input_timeout_ms,
+    rc_lan_controller_server** out_server) {
+  if (port == 0 || input_timeout_ms < 10 || input_timeout_ms > 5000 ||
+      out_server == nullptr) {
+    return RC_RESULT_INVALID_ARGUMENT;
+  }
+  *out_server = nullptr;
+  auto server = new (std::nothrow) rc_lan_controller_server(
+      port, std::chrono::milliseconds(input_timeout_ms));
+  if (server == nullptr) {
+    return RC_RESULT_BACKEND_FAILURE;
+  }
+  *out_server = server;
+  return RC_RESULT_OK;
+}
+
+extern "C" RC_API rc_result rc_lan_server_start(
+    rc_lan_controller_server* server) {
+  if (server == nullptr) {
+    return RC_RESULT_INVALID_ARGUMENT;
+  }
+  return ToAbiResult(server->implementation.Start());
+}
+
+extern "C" RC_API rc_result rc_lan_server_get_snapshot(
+    rc_lan_controller_server* server,
+    rc_lan_session_snapshot_v1* out_snapshot) {
+  if (server == nullptr || out_snapshot == nullptr ||
+      out_snapshot->struct_size != sizeof(rc_lan_session_snapshot_v1)) {
+    return RC_RESULT_INVALID_ARGUMENT;
+  }
+  CopyLanSnapshot(server->implementation.Snapshot(), *out_snapshot);
+  return RC_RESULT_OK;
+}
+
+extern "C" RC_API rc_result rc_lan_server_stop(
+    rc_lan_controller_server* server) {
+  if (server == nullptr) {
+    return RC_RESULT_INVALID_ARGUMENT;
+  }
+  return ToAbiResult(server->implementation.Stop());
+}
+
+extern "C" RC_API void rc_lan_server_destroy(
+    rc_lan_controller_server* server) {
+  delete server;
 }
 
 extern "C" RC_API rc_result rc_session_create_loopback(

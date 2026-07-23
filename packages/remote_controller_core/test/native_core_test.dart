@@ -1,8 +1,10 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // Copyright (C) 2026 Remote Controller contributors
 
+import 'dart:async';
 import 'dart:io';
 import 'dart:isolate';
+import 'dart:typed_data';
 
 import 'package:remote_controller_core/remote_controller_core.dart';
 import 'package:test/test.dart';
@@ -236,6 +238,206 @@ void main() {
     expect(released.acceptedStateCount, 2);
     expect(released.outputState.buttonFlags, 0);
   });
+
+  test('LAN diagnostic server accepts full UDP state and watchdog neutralizes', () async {
+    if (!VigemController.runtimeInfo.available) {
+      return;
+    }
+    final portProbe = await ServerSocket.bind(InternetAddress.loopbackIPv4, 0);
+    final port = portProbe.port;
+    await portProbe.close();
+
+    final server = LanController.createServer(
+      port: port,
+      inputTimeout: const Duration(milliseconds: 80),
+    );
+    addTearDown(server.close);
+    server.start();
+
+    Socket? control;
+    final deadline = DateTime.now().add(const Duration(seconds: 2));
+    while (control == null && DateTime.now().isBefore(deadline)) {
+      try {
+        control = await Socket.connect(
+          InternetAddress.loopbackIPv4,
+          port,
+          timeout: const Duration(milliseconds: 200),
+        );
+      } on SocketException {
+        await Future<void>.delayed(const Duration(milliseconds: 20));
+      }
+    }
+    expect(control, isNotNull);
+    addTearDown(() => control?.destroy());
+
+    const sessionId = 0x12345678;
+    control!.add(_controlFrame(type: 1, sessionId: sessionId));
+    await control.flush();
+    final ack = await _readBytes(control, 32);
+    expect(ByteData.sublistView(ack).getUint8(5), 2);
+
+    final udp = await RawDatagramSocket.bind(InternetAddress.loopbackIPv4, 0);
+    addTearDown(udp.close);
+    udp.send(
+      _inputPacket(sessionId: sessionId),
+      InternetAddress.loopbackIPv4,
+      port,
+    );
+
+    final applied = await _waitForLan(
+      server,
+      (snapshot) => snapshot.receivedPacketCount == 1,
+    );
+    expect(applied.connected, isTrue);
+    expect(applied.latestSequence, 7);
+    expect(applied.currentState.buttonFlags, GamepadButton.a);
+    expect(applied.currentState.leftTrigger, 65535);
+    expect(applied.currentState.rightTrigger, 32768);
+    expect(applied.currentState.leftStickX, -32768);
+    expect(applied.currentState.leftStickY, 32767);
+
+    final neutral = await _waitForLan(
+      server,
+      (snapshot) => snapshot.neutralizationCount >= 1,
+    );
+    expect(neutral.currentState.buttonFlags, 0);
+    expect(neutral.currentState.leftTrigger, 0);
+  });
+
+  test('LAN native client streams an attached SDL gamepad when available', () async {
+    if (!VigemController.runtimeInfo.available) {
+      return;
+    }
+    final devices = SdlInput.enumerateGamepads();
+    if (devices.isEmpty) {
+      return;
+    }
+    final device = devices.firstWhere(
+      (candidate) => candidate.isRogAllyX,
+      orElse: () => devices.first,
+    );
+    final portProbe = await ServerSocket.bind(InternetAddress.loopbackIPv4, 0);
+    final port = portProbe.port;
+    await portProbe.close();
+
+    final server = LanController.createServer(port: port);
+    final client = LanController.createClient(
+      instanceId: device.instanceId,
+      serverAddress: InternetAddress.loopbackIPv4.address,
+      port: port,
+    );
+    addTearDown(server.close);
+    addTearDown(client.close);
+    server.start();
+    client.start();
+
+    final connectedClient = await _waitForLanClient(
+      client,
+      (snapshot) => snapshot.connected && snapshot.sentPacketCount > 0,
+    );
+    expect(connectedClient.state, LanSessionState.running);
+    final connectedServer = await _waitForLan(
+      server,
+      (snapshot) => snapshot.connected && snapshot.receivedPacketCount > 0,
+    );
+    expect(connectedServer.state, LanSessionState.running);
+    expect(connectedServer.latestSequence, greaterThan(0));
+  });
+}
+
+Uint8List _controlFrame({required int type, required int sessionId}) {
+  final data = ByteData(32)
+    ..setUint32(0, 0x31434352, Endian.little)
+    ..setUint8(4, 1)
+    ..setUint8(5, type)
+    ..setUint16(6, 0, Endian.little)
+    ..setUint16(8, 32, Endian.little)
+    ..setUint16(10, 0, Endian.little)
+    ..setUint32(12, sessionId, Endian.little);
+  return data.buffer.asUint8List();
+}
+
+Uint8List _inputPacket({required int sessionId}) {
+  final data = ByteData(64)
+    ..setUint32(0, 0x31494352, Endian.little)
+    ..setUint8(4, 1)
+    ..setUint8(5, 1)
+    ..setUint16(6, 1, Endian.little)
+    ..setUint16(8, 64, Endian.little)
+    ..setUint16(10, 32, Endian.little)
+    ..setUint32(12, sessionId, Endian.little)
+    ..setUint64(16, 7, Endian.little)
+    ..setUint64(24, 123456789, Endian.little)
+    ..setUint32(32, GamepadButton.a, Endian.little)
+    ..setUint16(36, 65535, Endian.little)
+    ..setUint16(38, 32768, Endian.little)
+    ..setInt16(40, -32768, Endian.little)
+    ..setInt16(42, 32767, Endian.little)
+    ..setInt16(44, -1234, Endian.little)
+    ..setInt16(46, 4321, Endian.little);
+  return data.buffer.asUint8List();
+}
+
+Future<Uint8List> _readBytes(Socket socket, int count) async {
+  final builder = BytesBuilder(copy: false);
+  final completer = Completer<Uint8List>();
+  socket.listen(
+    (chunk) {
+      if (completer.isCompleted) {
+        return;
+      }
+      builder.add(chunk);
+      if (builder.length >= count) {
+        final bytes = builder.takeBytes();
+        completer.complete(Uint8List.sublistView(bytes, 0, count));
+      }
+    },
+    onError: completer.completeError,
+    onDone: () {
+      if (!completer.isCompleted) {
+        completer.completeError(
+          TestFailure('The control socket closed before $count bytes arrived.'),
+        );
+      }
+    },
+  );
+  return completer.future.timeout(const Duration(seconds: 2));
+}
+
+Future<LanSessionSnapshot> _waitForLan(
+  LanControllerServer server,
+  bool Function(LanSessionSnapshot snapshot) predicate,
+) async {
+  final deadline = DateTime.now().add(const Duration(seconds: 2));
+  while (DateTime.now().isBefore(deadline)) {
+    final snapshot = server.snapshot();
+    if (predicate(snapshot)) {
+      return snapshot;
+    }
+    await Future<void>.delayed(const Duration(milliseconds: 5));
+  }
+  throw TestFailure('Timed out waiting for LAN session state.');
+}
+
+Future<LanSessionSnapshot> _waitForLanClient(
+  LanControllerClient client,
+  bool Function(LanSessionSnapshot snapshot) predicate,
+) async {
+  final deadline = DateTime.now().add(const Duration(seconds: 5));
+  while (DateTime.now().isBefore(deadline)) {
+    final snapshot = client.snapshot();
+    if (predicate(snapshot)) {
+      return snapshot;
+    }
+    if (snapshot.state == LanSessionState.faulted ||
+        snapshot.state == LanSessionState.disconnected) {
+      throw TestFailure(
+        'LAN client failed: ${snapshot.error} (${snapshot.lastError}).',
+      );
+    }
+    await Future<void>.delayed(const Duration(milliseconds: 10));
+  }
+  throw TestFailure('Timed out waiting for LAN client state.');
 }
 
 Future<NativeSessionSnapshot> _waitFor(

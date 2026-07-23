@@ -4,6 +4,7 @@
 import 'package:remote_controller/domain/models/core_info.dart';
 import 'package:remote_controller/domain/models/input_capture_snapshot.dart';
 import 'package:remote_controller/domain/models/input_device.dart';
+import 'package:remote_controller/domain/models/lan_session.dart';
 import 'package:remote_controller/domain/models/loopback_diagnostic.dart';
 import 'package:remote_controller/domain/models/virtual_controller.dart';
 
@@ -31,6 +32,18 @@ abstract interface class CoreRepository {
   LocalBridgeSnapshot getLocalBridgeSnapshot();
 
   void stopLocalBridge();
+
+  void startLanClient(int instanceId, String serverAddress);
+
+  LanSessionStatus getLanClientStatus();
+
+  void stopLanClient();
+
+  void startLanServer();
+
+  LanSessionStatus getLanServerStatus();
+
+  void stopLanServer();
 
   void dispose();
 }

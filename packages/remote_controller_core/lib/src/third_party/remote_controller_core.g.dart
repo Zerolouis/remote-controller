@@ -108,6 +108,76 @@ external void rc_local_bridge_destroy(
   ffi.Pointer<rc_local_controller_bridge> bridge,
 );
 
+@ffi.Native<
+  ffi.Int32 Function(
+    ffi.Uint32,
+    ffi.Pointer<ffi.Char>,
+    ffi.Uint16,
+    ffi.Pointer<ffi.Pointer<rc_lan_controller_client>>,
+  )
+>()
+external int rc_lan_client_create(
+  int instance_id,
+  ffi.Pointer<ffi.Char> server_address_utf8,
+  int port,
+  ffi.Pointer<ffi.Pointer<rc_lan_controller_client>> out_client,
+);
+
+@ffi.Native<ffi.Int32 Function(ffi.Pointer<rc_lan_controller_client>)>()
+external int rc_lan_client_start(
+  ffi.Pointer<rc_lan_controller_client> client,
+);
+
+@ffi.Native<
+  ffi.Int32 Function(ffi.Pointer<rc_lan_controller_client>, ffi.Pointer<rc_lan_session_snapshot_v1>)
+>()
+external int rc_lan_client_get_snapshot(
+  ffi.Pointer<rc_lan_controller_client> client,
+  ffi.Pointer<rc_lan_session_snapshot_v1> out_snapshot,
+);
+
+@ffi.Native<ffi.Int32 Function(ffi.Pointer<rc_lan_controller_client>)>()
+external int rc_lan_client_stop(
+  ffi.Pointer<rc_lan_controller_client> client,
+);
+
+@ffi.Native<ffi.Void Function(ffi.Pointer<rc_lan_controller_client>)>()
+external void rc_lan_client_destroy(
+  ffi.Pointer<rc_lan_controller_client> client,
+);
+
+@ffi.Native<
+  ffi.Int32 Function(ffi.Uint16, ffi.Uint32, ffi.Pointer<ffi.Pointer<rc_lan_controller_server>>)
+>()
+external int rc_lan_server_create(
+  int port,
+  int input_timeout_ms,
+  ffi.Pointer<ffi.Pointer<rc_lan_controller_server>> out_server,
+);
+
+@ffi.Native<ffi.Int32 Function(ffi.Pointer<rc_lan_controller_server>)>()
+external int rc_lan_server_start(
+  ffi.Pointer<rc_lan_controller_server> server,
+);
+
+@ffi.Native<
+  ffi.Int32 Function(ffi.Pointer<rc_lan_controller_server>, ffi.Pointer<rc_lan_session_snapshot_v1>)
+>()
+external int rc_lan_server_get_snapshot(
+  ffi.Pointer<rc_lan_controller_server> server,
+  ffi.Pointer<rc_lan_session_snapshot_v1> out_snapshot,
+);
+
+@ffi.Native<ffi.Int32 Function(ffi.Pointer<rc_lan_controller_server>)>()
+external int rc_lan_server_stop(
+  ffi.Pointer<rc_lan_controller_server> server,
+);
+
+@ffi.Native<ffi.Void Function(ffi.Pointer<rc_lan_controller_server>)>()
+external void rc_lan_server_destroy(
+  ffi.Pointer<rc_lan_controller_server> server,
+);
+
 @ffi.Native<ffi.Int32 Function(ffi.Uint32, ffi.Pointer<ffi.Pointer<rc_session>>)>()
 external int rc_session_create_loopback(
   int input_timeout_ms,
@@ -160,6 +230,10 @@ final class rc_session extends ffi.Opaque {}
 final class rc_input_capture extends ffi.Opaque {}
 
 final class rc_local_controller_bridge extends ffi.Opaque {}
+
+final class rc_lan_controller_client extends ffi.Opaque {}
+
+final class rc_lan_controller_server extends ffi.Opaque {}
 
 final class rc_gamepad_state_v1 extends ffi.Struct {
   @ffi.Uint32()
@@ -379,4 +453,56 @@ final class rc_local_bridge_snapshot_v1 extends ffi.Struct {
 
   @ffi.Uint32()
   external int reserved;
+}
+
+final class rc_lan_session_snapshot_v1 extends ffi.Struct {
+  @ffi.Uint32()
+  external int struct_size;
+
+  @ffi.Uint32()
+  external int state;
+
+  @ffi.Uint32()
+  external int connected;
+
+  @ffi.Uint32()
+  external int reserved;
+
+  @ffi.Uint64()
+  external int sent_packet_count;
+
+  @ffi.Uint64()
+  external int received_packet_count;
+
+  @ffi.Uint64()
+  external int dropped_packet_count;
+
+  @ffi.Uint64()
+  external int neutralization_count;
+
+  @ffi.Uint64()
+  external int latest_sequence;
+
+  @ffi.Uint64()
+  external int last_input_timestamp_us;
+
+  @ffi.Uint64()
+  external int rumble_count;
+
+  external rc_gamepad_state_v1 current_state;
+
+  @ffi.Uint16()
+  external int low_frequency_motor;
+
+  @ffi.Uint16()
+  external int high_frequency_motor;
+
+  @ffi.Uint32()
+  external int last_error;
+
+  @ffi.Array.multi([64])
+  external ffi.Array<ffi.Char> peer_address;
+
+  @ffi.Array.multi([256])
+  external ffi.Array<ffi.Char> error;
 }

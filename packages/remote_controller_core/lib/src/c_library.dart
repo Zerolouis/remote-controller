@@ -14,12 +14,14 @@ CLibrary createRemoteControllerLibrary({
   assetName: remoteControllerAssetName,
   sources: [
     'native/src/loopback_transport_backend.cpp',
+    'native/src/lan_controller_session.cpp',
     'native/src/local_controller_bridge.cpp',
     'native/src/memory_virtual_controller_backend.cpp',
     'native/src/input_capture.cpp',
     'native/src/remote_controller_core.cpp',
     'native/src/sdl_input_backend.cpp',
     'native/src/session.cpp',
+    'native/src/udp_lan_transport_backend.cpp',
     'native/src/vigem_installer.cpp',
     'native/src/vigem_virtual_controller_backend.cpp',
     vigemSourceFile,
@@ -29,7 +31,7 @@ CLibrary createRemoteControllerLibrary({
     sdlIncludeDirectory,
     vigemIncludeDirectory,
   ],
-  libraries: const ['setupapi', 'shell32', 'bcrypt'],
+  libraries: const ['setupapi', 'shell32', 'bcrypt', 'ws2_32'],
   defines: const {
     'UNICODE': '1',
     '_UNICODE': '1',
@@ -44,5 +46,5 @@ CLibrary createRemoteControllerLibrary({
 final remoteControllerLinker = CLinker.library(
   name: 'remote_controller_core',
   assetName: remoteControllerAssetName,
-  libraries: const ['setupapi', 'shell32', 'bcrypt'],
+  libraries: const ['setupapi', 'shell32', 'bcrypt', 'ws2_32'],
 );

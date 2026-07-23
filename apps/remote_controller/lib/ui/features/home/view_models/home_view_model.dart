@@ -9,6 +9,7 @@ import 'package:remote_controller/domain/models/app_role.dart';
 import 'package:remote_controller/domain/models/core_info.dart';
 import 'package:remote_controller/domain/models/input_capture_snapshot.dart';
 import 'package:remote_controller/domain/models/input_device.dart';
+import 'package:remote_controller/domain/models/lan_session.dart';
 import 'package:remote_controller/domain/models/loopback_diagnostic.dart';
 import 'package:remote_controller/domain/models/virtual_controller.dart';
 
@@ -38,6 +39,12 @@ final class HomeViewModel extends ChangeNotifier {
   LocalBridgeSnapshot? _localBridgeSnapshot;
   Object? _bridgeError;
   Timer? _bridgePollTimer;
+  String _serverAddress = '127.0.0.1';
+  int? _lanClientDeviceId;
+  bool _lanServerActive = false;
+  LanSessionStatus? _lanSessionStatus;
+  Object? _lanSessionError;
+  Timer? _lanPollTimer;
 
   CoreInfo? get coreInfo => _coreInfo;
   Object? get coreError => _coreError;
@@ -58,6 +65,11 @@ final class HomeViewModel extends ChangeNotifier {
   int? get bridgedDeviceId => _bridgedDeviceId;
   LocalBridgeSnapshot? get localBridgeSnapshot => _localBridgeSnapshot;
   Object? get bridgeError => _bridgeError;
+  String get serverAddress => _serverAddress;
+  int? get lanClientDeviceId => _lanClientDeviceId;
+  bool get lanServerActive => _lanServerActive;
+  LanSessionStatus? get lanSessionStatus => _lanSessionStatus;
+  Object? get lanSessionError => _lanSessionError;
 
   void initialize() {
     try {
@@ -89,6 +101,8 @@ final class HomeViewModel extends ChangeNotifier {
     }
     stopInputCapture();
     stopLocalBridge();
+    stopLanClient();
+    stopLanServer();
     _selectedRole = null;
     notifyListeners();
   }
@@ -113,7 +127,10 @@ final class HomeViewModel extends ChangeNotifier {
   }
 
   Future<void> refreshInputDevices() async {
-    if (_isLoadingInputDevices || _capturedDeviceId != null || _bridgedDeviceId != null) {
+    if (_isLoadingInputDevices ||
+        _capturedDeviceId != null ||
+        _bridgedDeviceId != null ||
+        _lanClientDeviceId != null) {
       return;
     }
     _isLoadingInputDevices = true;
@@ -171,6 +188,7 @@ final class HomeViewModel extends ChangeNotifier {
 
   void startInputCapture(InputDevice device) {
     stopLocalBridge();
+    stopLanClient();
     if (_capturedDeviceId != null) {
       stopInputCapture();
     }
@@ -219,6 +237,7 @@ final class HomeViewModel extends ChangeNotifier {
 
   void startLocalBridge(InputDevice device) {
     stopInputCapture();
+    stopLanClient();
     if (_bridgedDeviceId != null) {
       stopLocalBridge();
     }
@@ -265,10 +284,111 @@ final class HomeViewModel extends ChangeNotifier {
     notifyListeners();
   }
 
+  void setServerAddress(String value) {
+    _serverAddress = value;
+  }
+
+  void startLanClient(InputDevice device) {
+    final address = _serverAddress.trim();
+    if (address.isEmpty) {
+      _lanSessionError = ArgumentError('请输入电脑的 IPv4 地址或主机名。');
+      notifyListeners();
+      return;
+    }
+    stopInputCapture();
+    stopLocalBridge();
+    stopLanClient();
+    try {
+      _coreRepository.startLanClient(device.instanceId, address);
+      _lanClientDeviceId = device.instanceId;
+      _lanServerActive = false;
+      _lanSessionStatus = _coreRepository.getLanClientStatus();
+      _lanSessionError = null;
+      _startLanPolling();
+    } on Object catch (error) {
+      _lanClientDeviceId = null;
+      _lanSessionStatus = null;
+      _lanSessionError = error;
+    }
+    notifyListeners();
+  }
+
+  void stopLanClient() {
+    if (_lanClientDeviceId == null) {
+      return;
+    }
+    _lanPollTimer?.cancel();
+    _lanPollTimer = null;
+    _coreRepository.stopLanClient();
+    _lanClientDeviceId = null;
+    _lanSessionStatus = null;
+    notifyListeners();
+  }
+
+  void startLanServer() {
+    if (_lanServerActive || _virtualControllerRuntime?.available != true) {
+      return;
+    }
+    stopLanServer();
+    try {
+      _coreRepository.startLanServer();
+      _lanServerActive = true;
+      _lanClientDeviceId = null;
+      _lanSessionStatus = _coreRepository.getLanServerStatus();
+      _lanSessionError = null;
+      _startLanPolling();
+    } on Object catch (error) {
+      _lanServerActive = false;
+      _lanSessionStatus = null;
+      _lanSessionError = error;
+    }
+    notifyListeners();
+  }
+
+  void stopLanServer() {
+    if (!_lanServerActive) {
+      return;
+    }
+    _lanPollTimer?.cancel();
+    _lanPollTimer = null;
+    _coreRepository.stopLanServer();
+    _lanServerActive = false;
+    _lanSessionStatus = null;
+    notifyListeners();
+  }
+
+  void _startLanPolling() {
+    _lanPollTimer?.cancel();
+    _lanPollTimer = Timer.periodic(
+      const Duration(milliseconds: 100),
+      (_) => _pollLanSession(),
+    );
+  }
+
+  void _pollLanSession() {
+    try {
+      final status = _lanClientDeviceId != null
+          ? _coreRepository.getLanClientStatus()
+          : _coreRepository.getLanServerStatus();
+      _lanSessionStatus = status;
+      _lanSessionError = null;
+      if (status.state == 'disconnected' || status.state == 'faulted') {
+        _lanPollTimer?.cancel();
+        _lanPollTimer = null;
+      }
+    } on Object catch (error) {
+      _lanSessionError = error;
+      _lanPollTimer?.cancel();
+      _lanPollTimer = null;
+    }
+    notifyListeners();
+  }
+
   @override
   void dispose() {
     _capturePollTimer?.cancel();
     _bridgePollTimer?.cancel();
+    _lanPollTimer?.cancel();
     _coreRepository.dispose();
     super.dispose();
   }

@@ -1,3 +1,10 @@
+## 0.6.0
+
+- Add a Windows UDP LAN `TransportBackend` with a separate reliable TCP control and rumble channel.
+- Add native Client SDL-to-network and Server network-to-ViGEm session coordinators with sequence validation and a 100 ms neutral watchdog.
+- Add generated FFI session APIs, Flutter diagnostics, packet statistics, and an end-to-end localhost protocol test.
+- Mark the initial network path as plaintext trusted-LAN diagnostics pending pairing and AEAD.
+
 ## 0.5.0
 
 - Add a generated C/Dart ABI for launching an authenticated ViGEmBus installer through Windows UAC.

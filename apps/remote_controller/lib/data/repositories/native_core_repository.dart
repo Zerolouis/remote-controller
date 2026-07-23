@@ -7,6 +7,7 @@ import 'package:remote_controller/data/services/vigem_installer_service.dart';
 import 'package:remote_controller/domain/models/core_info.dart';
 import 'package:remote_controller/domain/models/input_capture_snapshot.dart';
 import 'package:remote_controller/domain/models/input_device.dart';
+import 'package:remote_controller/domain/models/lan_session.dart';
 import 'package:remote_controller/domain/models/loopback_diagnostic.dart';
 import 'package:remote_controller/domain/models/virtual_controller.dart' as domain;
 import 'package:remote_controller_core/remote_controller_core.dart';
@@ -149,5 +150,50 @@ final class NativeCoreRepository implements CoreRepository {
   void stopLocalBridge() => _service.stopLocalBridge();
 
   @override
+  void startLanClient(int instanceId, String serverAddress) =>
+      _service.startLanClient(instanceId, serverAddress);
+
+  @override
+  LanSessionStatus getLanClientStatus() => _mapLanSession(_service.getLanClientStatus());
+
+  @override
+  void stopLanClient() => _service.stopLanClient();
+
+  @override
+  void startLanServer() => _service.startLanServer();
+
+  @override
+  LanSessionStatus getLanServerStatus() => _mapLanSession(_service.getLanServerStatus());
+
+  @override
+  void stopLanServer() => _service.stopLanServer();
+
+  @override
   void dispose() => _service.dispose();
+
+  LanSessionStatus _mapLanSession(LanSessionSnapshot snapshot) {
+    final state = snapshot.currentState;
+    return LanSessionStatus(
+      state: snapshot.state.name,
+      connected: snapshot.connected,
+      sentPacketCount: snapshot.sentPacketCount,
+      receivedPacketCount: snapshot.receivedPacketCount,
+      droppedPacketCount: snapshot.droppedPacketCount,
+      neutralizationCount: snapshot.neutralizationCount,
+      latestSequence: snapshot.latestSequence,
+      buttonFlags: state.buttonFlags,
+      leftTrigger: state.leftTrigger,
+      rightTrigger: state.rightTrigger,
+      leftStickX: state.leftStickX,
+      leftStickY: state.leftStickY,
+      rightStickX: state.rightStickX,
+      rightStickY: state.rightStickY,
+      rumbleCount: snapshot.rumbleCount,
+      lowFrequencyMotor: snapshot.lowFrequencyMotor,
+      highFrequencyMotor: snapshot.highFrequencyMotor,
+      peerAddress: snapshot.peerAddress,
+      lastError: snapshot.lastError,
+      error: snapshot.error,
+    );
+  }
 }

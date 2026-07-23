@@ -2,7 +2,7 @@
 
 Remote Controller 是一个面向 Windows 掌机和 Windows PC 的开源局域网手柄转发项目。掌机端读取并临时独占实体手柄，PC 端创建虚拟 Xbox 手柄，并将震动反馈传回掌机。
 
-当前仓库处于 M1 阶段：Flutter Windows 界面、C/C++ Native Assets、自动生成的 FFI 绑定、SDL 3 实体手柄采集、ViGEm 虚拟 Xbox 360 输出、本机震动回传诊断和经 SHA-256 校验的官方 ViGEmBus 安装入口已经建立；HidHide、加密局域网传输和正式 Client/Server 会话尚未接入。
+当前仓库已进入 M2：Flutter Windows 界面、C/C++ Native Assets、自动生成的 FFI 绑定、SDL 3 实体手柄采集、ViGEm 虚拟 Xbox 360 输出、本机震动回传诊断、ViGEmBus 安装入口，以及首个 TCP 控制 + UDP 完整状态局域网诊断链路已经建立。该网络链路尚未配对或加密，只能在可信局域网测试；HidHide 和正式安全会话仍未接入。
 
 ## 范围
 
