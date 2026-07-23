@@ -5,4 +5,11 @@
 const remoteControllerRecordUseMapping = <String, String>{
   'rc_get_abi_version': 'rc_get_abi_version',
   'rc_get_build_info': 'rc_get_build_info',
+  'rc_session_create_loopback': 'rc_session_create_loopback',
+  'rc_session_destroy': 'rc_session_destroy',
+  'rc_session_get_snapshot': 'rc_session_get_snapshot',
+  'rc_session_simulate_disconnect': 'rc_session_simulate_disconnect',
+  'rc_session_start': 'rc_session_start',
+  'rc_session_stop': 'rc_session_stop',
+  'rc_session_submit_state': 'rc_session_submit_state',
 };

@@ -6,6 +6,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:remote_controller/app.dart';
 import 'package:remote_controller/data/repositories/core_repository.dart';
 import 'package:remote_controller/domain/models/core_info.dart';
+import 'package:remote_controller/domain/models/loopback_diagnostic.dart';
 
 void main() {
   testWidgets('shows healthy native core and both roles', (tester) async {
@@ -36,6 +37,22 @@ void main() {
 
     expect(find.byKey(const Key('client-role')), findsOneWidget);
   });
+
+  testWidgets('runs native loopback diagnostic from role dashboard', (tester) async {
+    await tester.binding.setSurfaceSize(const Size(1280, 900));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+
+    await tester.pumpWidget(const RemoteControllerApp(coreRepository: _FakeCoreRepository()));
+    await tester.tap(find.byKey(const Key('client-role')));
+    await tester.pump();
+
+    expect(find.textContaining('尚未运行'), findsOneWidget);
+    await tester.tap(find.byKey(const Key('run-loopback-diagnostic')));
+    await tester.pumpAndSettle();
+
+    expect(find.textContaining('自检通过'), findsOneWidget);
+    expect(find.textContaining('1 次安全归零'), findsOneWidget);
+  });
 }
 
 final class _FakeCoreRepository implements CoreRepository {
@@ -45,5 +62,12 @@ final class _FakeCoreRepository implements CoreRepository {
   CoreInfo getCoreInfo() => const CoreInfo(
     abiVersion: 1,
     buildInfo: 'remote-controller-core/test',
+  );
+
+  @override
+  Future<LoopbackDiagnostic> runLoopbackDiagnostic() async => const LoopbackDiagnostic(
+    acceptedStateCount: 1,
+    neutralizationCount: 1,
+    elapsedMilliseconds: 50,
   );
 }

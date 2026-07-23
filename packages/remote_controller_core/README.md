@@ -7,4 +7,7 @@ Native Windows controller core and generated Dart FFI facade for Remote Controll
 - FFI generator: `tool/ffigen.dart`
 - Generated bindings: `lib/src/third_party/`
 
-The current exported ABI is a smoke-test surface. The opaque session API documented in `docs/PROJECT_KNOWLEDGE.md` will be added as the hardware and transport backends are implemented.
+The exported ABI now includes an opaque loopback session used to validate the
+shared state machine, full-state fidelity, sequence rejection, disconnect
+release, and input-timeout watchdog. SDL, LAN, HidHide, and ViGEm backends are
+not connected yet.

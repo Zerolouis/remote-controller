@@ -5,6 +5,7 @@ import 'package:flutter/foundation.dart';
 import 'package:remote_controller/data/repositories/core_repository.dart';
 import 'package:remote_controller/domain/models/app_role.dart';
 import 'package:remote_controller/domain/models/core_info.dart';
+import 'package:remote_controller/domain/models/loopback_diagnostic.dart';
 
 final class HomeViewModel extends ChangeNotifier {
   HomeViewModel(this._coreRepository);
@@ -14,10 +15,16 @@ final class HomeViewModel extends ChangeNotifier {
   CoreInfo? _coreInfo;
   Object? _coreError;
   AppRole? _selectedRole;
+  bool _isRunningDiagnostic = false;
+  LoopbackDiagnostic? _diagnostic;
+  Object? _diagnosticError;
 
   CoreInfo? get coreInfo => _coreInfo;
   Object? get coreError => _coreError;
   AppRole? get selectedRole => _selectedRole;
+  bool get isRunningDiagnostic => _isRunningDiagnostic;
+  LoopbackDiagnostic? get diagnostic => _diagnostic;
+  Object? get diagnosticError => _diagnosticError;
 
   void initialize() {
     try {
@@ -44,5 +51,24 @@ final class HomeViewModel extends ChangeNotifier {
     }
     _selectedRole = null;
     notifyListeners();
+  }
+
+  Future<void> runLoopbackDiagnostic() async {
+    if (_isRunningDiagnostic) {
+      return;
+    }
+    _isRunningDiagnostic = true;
+    _diagnostic = null;
+    _diagnosticError = null;
+    notifyListeners();
+
+    try {
+      _diagnostic = await _coreRepository.runLoopbackDiagnostic();
+    } on Object catch (error) {
+      _diagnosticError = error;
+    } finally {
+      _isRunningDiagnostic = false;
+      notifyListeners();
+    }
   }
 }

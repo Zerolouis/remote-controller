@@ -19,3 +19,97 @@ external int rc_get_abi_version();
 
 @ffi.Native<ffi.Pointer<ffi.Char> Function()>(isLeaf: true)
 external ffi.Pointer<ffi.Char> rc_get_build_info();
+
+@ffi.Native<ffi.Int32 Function(ffi.Uint32, ffi.Pointer<ffi.Pointer<rc_session>>)>()
+external int rc_session_create_loopback(
+  int input_timeout_ms,
+  ffi.Pointer<ffi.Pointer<rc_session>> out_session,
+);
+
+@ffi.Native<ffi.Int32 Function(ffi.Pointer<rc_session>)>()
+external int rc_session_start(
+  ffi.Pointer<rc_session> session,
+);
+
+@ffi.Native<
+  ffi.Int32 Function(
+    ffi.Pointer<rc_session>,
+    ffi.Pointer<rc_gamepad_state_v1>,
+    ffi.Uint64,
+    ffi.Uint64,
+  )
+>()
+external int rc_session_submit_state(
+  ffi.Pointer<rc_session> session,
+  ffi.Pointer<rc_gamepad_state_v1> state,
+  int sequence,
+  int timestamp_us,
+);
+
+@ffi.Native<ffi.Int32 Function(ffi.Pointer<rc_session>, ffi.Pointer<rc_session_snapshot_v1>)>()
+external int rc_session_get_snapshot(
+  ffi.Pointer<rc_session> session,
+  ffi.Pointer<rc_session_snapshot_v1> out_snapshot,
+);
+
+@ffi.Native<ffi.Int32 Function(ffi.Pointer<rc_session>)>()
+external int rc_session_simulate_disconnect(
+  ffi.Pointer<rc_session> session,
+);
+
+@ffi.Native<ffi.Int32 Function(ffi.Pointer<rc_session>)>()
+external int rc_session_stop(
+  ffi.Pointer<rc_session> session,
+);
+
+@ffi.Native<ffi.Void Function(ffi.Pointer<rc_session>)>()
+external void rc_session_destroy(
+  ffi.Pointer<rc_session> session,
+);
+
+final class rc_session extends ffi.Opaque {}
+
+final class rc_gamepad_state_v1 extends ffi.Struct {
+  @ffi.Uint32()
+  external int button_flags;
+
+  @ffi.Uint16()
+  external int left_trigger;
+
+  @ffi.Uint16()
+  external int right_trigger;
+
+  @ffi.Int16()
+  external int left_stick_x;
+
+  @ffi.Int16()
+  external int left_stick_y;
+
+  @ffi.Int16()
+  external int right_stick_x;
+
+  @ffi.Int16()
+  external int right_stick_y;
+}
+
+final class rc_session_snapshot_v1 extends ffi.Struct {
+  @ffi.Uint32()
+  external int struct_size;
+
+  @ffi.Uint32()
+  external int state;
+
+  @ffi.Uint64()
+  external int latest_sequence;
+
+  @ffi.Uint64()
+  external int accepted_state_count;
+
+  @ffi.Uint64()
+  external int neutralization_count;
+
+  @ffi.Uint64()
+  external int last_input_timestamp_us;
+
+  external rc_gamepad_state_v1 output_state;
+}

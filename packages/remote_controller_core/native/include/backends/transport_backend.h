@@ -17,9 +17,15 @@ struct RumbleCommand {
   std::uint16_t high_frequency_motor{};
 };
 
+struct StateFrame {
+  protocol::GamepadStateV1 state{};
+  std::uint64_t sequence{};
+  std::uint64_t timestamp_us{};
+};
+
 class TransportBackend {
  public:
-  using StateCallback = std::function<void(const protocol::GamepadStateV1&)>;
+  using StateCallback = std::function<void(const StateFrame&)>;
   using RumbleCallback = std::function<void(const RumbleCommand&)>;
   using DisconnectCallback = std::function<void()>;
 

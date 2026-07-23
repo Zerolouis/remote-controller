@@ -8,7 +8,12 @@ const remoteControllerAssetName = 'src/third_party/remote_controller_core.g.dart
 final remoteControllerLibrary = CLibrary(
   name: 'remote_controller_core',
   assetName: remoteControllerAssetName,
-  sources: const ['native/src/remote_controller_core.cpp'],
+  sources: const [
+    'native/src/loopback_transport_backend.cpp',
+    'native/src/memory_virtual_controller_backend.cpp',
+    'native/src/remote_controller_core.cpp',
+    'native/src/session.cpp',
+  ],
   includes: const ['native/include'],
   language: Language.cpp,
   std: 'c++20',

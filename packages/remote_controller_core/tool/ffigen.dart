@@ -5,7 +5,19 @@ import 'dart:io';
 
 import 'package:ffigen/ffigen.dart';
 
-const _symbols = <String>{'rc_get_abi_version', 'rc_get_build_info'};
+const _symbols = <String>{
+  'rc_get_abi_version',
+  'rc_get_build_info',
+  'rc_session_create_loopback',
+  'rc_session_destroy',
+  'rc_session_get_snapshot',
+  'rc_session_simulate_disconnect',
+  'rc_session_start',
+  'rc_session_stop',
+  'rc_session_submit_state',
+};
+
+const _leafSymbols = <String>{'rc_get_abi_version', 'rc_get_build_info'};
 
 void main() {
   final packageRoot = Platform.script.resolve('../');
@@ -29,8 +41,12 @@ void main() {
     headers: Headers(entryPoints: <Uri>[header]),
     functions: Functions(
       include: (declaration) => _symbols.contains(declaration.originalName),
-      isLeaf: (_) => true,
+      isLeaf: (declaration) => _leafSymbols.contains(declaration.originalName),
     ),
+    structs: Structs.includeSet({
+      'rc_gamepad_state_v1',
+      'rc_session_snapshot_v1',
+    }),
     output: Output(
       dartFile: bindings,
       format: true,

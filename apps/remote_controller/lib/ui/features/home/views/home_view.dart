@@ -220,7 +220,9 @@ class _RoleDashboard extends StatelessWidget {
               const SizedBox(height: 16),
               Text(role.title, style: Theme.of(context).textTheme.headlineLarge),
               const SizedBox(height: 8),
-              const Text('MVP 架构骨架已就绪，硬件与网络后端尚未启用。'),
+              const Text('原生安全会话与本机 loopback 已就绪，硬件与网络后端尚未启用。'),
+              const SizedBox(height: 20),
+              _LoopbackDiagnosticCard(viewModel: viewModel),
               const SizedBox(height: 28),
               for (final step in steps) ...[
                 _SetupStep(number: step.$1, title: step.$2, description: step.$3),
@@ -234,6 +236,68 @@ class _RoleDashboard extends StatelessWidget {
               ),
             ],
           ),
+        ),
+      ),
+    );
+  }
+}
+
+class _LoopbackDiagnosticCard extends StatelessWidget {
+  const _LoopbackDiagnosticCard({required this.viewModel});
+
+  final HomeViewModel viewModel;
+
+  @override
+  Widget build(BuildContext context) {
+    final result = viewModel.diagnostic;
+    final error = viewModel.diagnosticError;
+    final running = viewModel.isRunningDiagnostic;
+    final Color accent;
+    final String message;
+    if (running) {
+      accent = Theme.of(context).colorScheme.primary;
+      message = '正在验证完整状态传递和输入超时自动归零…';
+    } else if (result != null) {
+      accent = const Color(0xff5eead4);
+      message =
+          '自检通过 · ${result.acceptedStateCount} 个完整状态 · '
+          '${result.neutralizationCount} 次安全归零 · ${result.elapsedMilliseconds} ms';
+    } else if (error != null) {
+      accent = const Color(0xffff8fa3);
+      message = '自检失败：$error';
+    } else {
+      accent = Colors.white54;
+      message = '尚未运行。此测试完全在本机原生核心中完成，不会创建系统虚拟手柄。';
+    }
+
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(18),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Icon(Icons.health_and_safety_rounded, color: accent),
+                const SizedBox(width: 10),
+                Text('原生链路安全自检', style: Theme.of(context).textTheme.titleMedium),
+              ],
+            ),
+            const SizedBox(height: 10),
+            Text(message, key: const Key('loopback-diagnostic-status')),
+            const SizedBox(height: 14),
+            OutlinedButton.icon(
+              key: const Key('run-loopback-diagnostic'),
+              onPressed: running ? null : viewModel.runLoopbackDiagnostic,
+              icon: running
+                  ? const SizedBox.square(
+                      dimension: 16,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                  : const Icon(Icons.play_arrow_rounded),
+              label: Text(running ? '正在自检' : '运行本机链路自检'),
+            ),
+          ],
         ),
       ),
     );
