@@ -21,6 +21,7 @@ extern "C" {
 #endif
 
 typedef struct rc_session rc_session;
+typedef struct rc_input_capture rc_input_capture;
 
 typedef int32_t rc_result;
 
@@ -29,12 +30,26 @@ typedef int32_t rc_result;
 #define RC_RESULT_INVALID_STATE 2
 #define RC_RESULT_STALE_SEQUENCE 3
 #define RC_RESULT_BACKEND_FAILURE 4
+#define RC_RESULT_NOT_FOUND 5
+#define RC_RESULT_BUFFER_TOO_SMALL 6
 
 #define RC_SESSION_STATE_CREATED 0
 #define RC_SESSION_STATE_RUNNING 1
 #define RC_SESSION_STATE_STOPPED 2
 #define RC_SESSION_STATE_DISCONNECTED 3
 #define RC_SESSION_STATE_FAULTED 4
+
+#define RC_INPUT_CAP_ANALOG_TRIGGERS (1U << 0)
+#define RC_INPUT_CAP_RUMBLE (1U << 1)
+#define RC_INPUT_CAP_TRIGGER_RUMBLE (1U << 2)
+
+#define RC_INPUT_DEVICE_FLAG_ROG_ALLY_X (1U << 0)
+
+#define RC_INPUT_DEVICE_NAME_CAPACITY 128
+#define RC_INPUT_DEVICE_PATH_CAPACITY 512
+#define RC_INPUT_DEVICE_GUID_CAPACITY 33
+#define RC_SDL_REVISION_CAPACITY 64
+#define RC_ERROR_MESSAGE_CAPACITY 256
 
 typedef struct rc_gamepad_state_v1 {
   uint32_t button_flags;
@@ -56,11 +71,78 @@ typedef struct rc_session_snapshot_v1 {
   rc_gamepad_state_v1 output_state;
 } rc_session_snapshot_v1;
 
+typedef struct rc_sdl_runtime_info_v1 {
+  uint32_t struct_size;
+  uint32_t available;
+  uint32_t version;
+  uint32_t reserved;
+  char revision[RC_SDL_REVISION_CAPACITY];
+  char error[RC_ERROR_MESSAGE_CAPACITY];
+} rc_sdl_runtime_info_v1;
+
+typedef struct rc_input_device_info_v1 {
+  uint32_t struct_size;
+  uint32_t instance_id;
+  uint16_t vendor_id;
+  uint16_t product_id;
+  uint16_t product_version;
+  uint16_t reserved;
+  uint32_t gamepad_type;
+  int32_t connection_state;
+  uint32_t capabilities;
+  uint32_t supported_buttons;
+  uint32_t flags;
+  char name[RC_INPUT_DEVICE_NAME_CAPACITY];
+  char path[RC_INPUT_DEVICE_PATH_CAPACITY];
+  char guid[RC_INPUT_DEVICE_GUID_CAPACITY];
+  uint8_t reserved_tail[3];
+} rc_input_device_info_v1;
+
+typedef struct rc_input_capture_snapshot_v1 {
+  uint32_t struct_size;
+  uint32_t state;
+  uint64_t sample_count;
+  uint64_t timestamp_us;
+  rc_gamepad_state_v1 current_state;
+  uint32_t observed_button_flags;
+  uint16_t left_trigger_max;
+  uint16_t right_trigger_max;
+  int16_t left_stick_x_min;
+  int16_t left_stick_x_max;
+  int16_t left_stick_y_min;
+  int16_t left_stick_y_max;
+  int16_t right_stick_x_min;
+  int16_t right_stick_x_max;
+  int16_t right_stick_y_min;
+  int16_t right_stick_y_max;
+} rc_input_capture_snapshot_v1;
+
 // ABI version for the exported C interface. Increase only for breaking changes.
 RC_API uint32_t rc_get_abi_version(void);
 
 // Returns a process-lifetime UTF-8 string owned by the native library.
 RC_API const char* rc_get_build_info(void);
+
+// Returns availability, exact runtime version, revision and initialization
+// error for the pinned SDL runtime. This function itself succeeds when SDL is
+// unavailable so callers can display the diagnostic error.
+RC_API rc_result rc_sdl_get_runtime_info(
+    rc_sdl_runtime_info_v1* out_runtime_info);
+
+// Two-pass enumeration. Call with devices=NULL and capacity=0 to query count.
+// On RC_RESULT_BUFFER_TOO_SMALL, out_count contains the new required count.
+RC_API rc_result rc_sdl_enumerate_gamepads(
+    rc_input_device_info_v1* devices, uint32_t capacity,
+    uint32_t* out_count);
+
+RC_API rc_result rc_sdl_capture_create(uint32_t instance_id,
+                                       rc_input_capture** out_capture);
+RC_API rc_result rc_input_capture_start(rc_input_capture* capture);
+RC_API rc_result rc_input_capture_get_snapshot(
+    rc_input_capture* capture,
+    rc_input_capture_snapshot_v1* out_snapshot);
+RC_API rc_result rc_input_capture_stop(rc_input_capture* capture);
+RC_API void rc_input_capture_destroy(rc_input_capture* capture);
 
 // Creates a native-only loopback session used to validate the common input
 // pipeline before hardware and network backends are attached.

@@ -1,3 +1,10 @@
+## 0.3.0
+
+- Pin SDL 3.4.12 and bundle its official Windows runtime through Native Assets.
+- Add SDL gamepad enumeration, capability reporting, and exact ROG Ally X VID/PID recognition.
+- Add a 250 Hz native raw-state capture thread without application deadzones, curves, or smoothing.
+- Add generated C/Dart FFI APIs and Flutter diagnostics for devices and observed input ranges.
+
 ## 0.2.0
 
 - Add the opaque loopback session C ABI and generated Dart facade.

@@ -20,6 +20,49 @@ external int rc_get_abi_version();
 @ffi.Native<ffi.Pointer<ffi.Char> Function()>(isLeaf: true)
 external ffi.Pointer<ffi.Char> rc_get_build_info();
 
+@ffi.Native<ffi.Int32 Function(ffi.Pointer<rc_sdl_runtime_info_v1>)>()
+external int rc_sdl_get_runtime_info(
+  ffi.Pointer<rc_sdl_runtime_info_v1> out_runtime_info,
+);
+
+@ffi.Native<
+  ffi.Int32 Function(ffi.Pointer<rc_input_device_info_v1>, ffi.Uint32, ffi.Pointer<ffi.Uint32>)
+>()
+external int rc_sdl_enumerate_gamepads(
+  ffi.Pointer<rc_input_device_info_v1> devices,
+  int capacity,
+  ffi.Pointer<ffi.Uint32> out_count,
+);
+
+@ffi.Native<ffi.Int32 Function(ffi.Uint32, ffi.Pointer<ffi.Pointer<rc_input_capture>>)>()
+external int rc_sdl_capture_create(
+  int instance_id,
+  ffi.Pointer<ffi.Pointer<rc_input_capture>> out_capture,
+);
+
+@ffi.Native<ffi.Int32 Function(ffi.Pointer<rc_input_capture>)>()
+external int rc_input_capture_start(
+  ffi.Pointer<rc_input_capture> capture,
+);
+
+@ffi.Native<
+  ffi.Int32 Function(ffi.Pointer<rc_input_capture>, ffi.Pointer<rc_input_capture_snapshot_v1>)
+>()
+external int rc_input_capture_get_snapshot(
+  ffi.Pointer<rc_input_capture> capture,
+  ffi.Pointer<rc_input_capture_snapshot_v1> out_snapshot,
+);
+
+@ffi.Native<ffi.Int32 Function(ffi.Pointer<rc_input_capture>)>()
+external int rc_input_capture_stop(
+  ffi.Pointer<rc_input_capture> capture,
+);
+
+@ffi.Native<ffi.Void Function(ffi.Pointer<rc_input_capture>)>()
+external void rc_input_capture_destroy(
+  ffi.Pointer<rc_input_capture> capture,
+);
+
 @ffi.Native<ffi.Int32 Function(ffi.Uint32, ffi.Pointer<ffi.Pointer<rc_session>>)>()
 external int rc_session_create_loopback(
   int input_timeout_ms,
@@ -69,6 +112,8 @@ external void rc_session_destroy(
 
 final class rc_session extends ffi.Opaque {}
 
+final class rc_input_capture extends ffi.Opaque {}
+
 final class rc_gamepad_state_v1 extends ffi.Struct {
   @ffi.Uint32()
   external int button_flags;
@@ -112,4 +157,120 @@ final class rc_session_snapshot_v1 extends ffi.Struct {
   external int last_input_timestamp_us;
 
   external rc_gamepad_state_v1 output_state;
+}
+
+final class rc_sdl_runtime_info_v1 extends ffi.Struct {
+  @ffi.Uint32()
+  external int struct_size;
+
+  @ffi.Uint32()
+  external int available;
+
+  @ffi.Uint32()
+  external int version;
+
+  @ffi.Uint32()
+  external int reserved;
+
+  @ffi.Array.multi([64])
+  external ffi.Array<ffi.Char> revision;
+
+  @ffi.Array.multi([256])
+  external ffi.Array<ffi.Char> error;
+}
+
+final class rc_input_device_info_v1 extends ffi.Struct {
+  @ffi.Uint32()
+  external int struct_size;
+
+  @ffi.Uint32()
+  external int instance_id;
+
+  @ffi.Uint16()
+  external int vendor_id;
+
+  @ffi.Uint16()
+  external int product_id;
+
+  @ffi.Uint16()
+  external int product_version;
+
+  @ffi.Uint16()
+  external int reserved;
+
+  @ffi.Uint32()
+  external int gamepad_type;
+
+  @ffi.Int32()
+  external int connection_state;
+
+  @ffi.Uint32()
+  external int capabilities;
+
+  @ffi.Uint32()
+  external int supported_buttons;
+
+  @ffi.Uint32()
+  external int flags;
+
+  @ffi.Array.multi([128])
+  external ffi.Array<ffi.Char> name;
+
+  @ffi.Array.multi([512])
+  external ffi.Array<ffi.Char> path;
+
+  @ffi.Array.multi([33])
+  external ffi.Array<ffi.Char> guid;
+
+  @ffi.Array.multi([3])
+  external ffi.Array<ffi.Uint8> reserved_tail;
+}
+
+final class rc_input_capture_snapshot_v1 extends ffi.Struct {
+  @ffi.Uint32()
+  external int struct_size;
+
+  @ffi.Uint32()
+  external int state;
+
+  @ffi.Uint64()
+  external int sample_count;
+
+  @ffi.Uint64()
+  external int timestamp_us;
+
+  external rc_gamepad_state_v1 current_state;
+
+  @ffi.Uint32()
+  external int observed_button_flags;
+
+  @ffi.Uint16()
+  external int left_trigger_max;
+
+  @ffi.Uint16()
+  external int right_trigger_max;
+
+  @ffi.Int16()
+  external int left_stick_x_min;
+
+  @ffi.Int16()
+  external int left_stick_x_max;
+
+  @ffi.Int16()
+  external int left_stick_y_min;
+
+  @ffi.Int16()
+  external int left_stick_y_max;
+
+  @ffi.Int16()
+  external int right_stick_x_min;
+
+  @ffi.Int16()
+  external int right_stick_x_max;
+
+  @ffi.Int16()
+  external int right_stick_y_min;
+
+  @ffi.Int16()
+  external int right_stick_y_max;
 }

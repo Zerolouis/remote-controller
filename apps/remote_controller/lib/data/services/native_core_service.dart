@@ -5,9 +5,42 @@ import 'package:remote_controller/data/models/loopback_diagnostic_data.dart';
 import 'package:remote_controller_core/remote_controller_core.dart';
 
 final class NativeCoreService {
+  SdlInputCapture? _inputCapture;
+
   int getAbiVersion() => RemoteControllerCore.abiVersion;
 
   String getBuildInfo() => RemoteControllerCore.buildInfo;
+
+  SdlRuntimeInfo getInputRuntime() => SdlInput.runtimeInfo;
+
+  List<SdlGamepadDevice> enumerateInputDevices() => SdlInput.enumerateGamepads();
+
+  void startInputCapture(int instanceId) {
+    stopInputCapture();
+    final capture = SdlInput.createCapture(instanceId);
+    try {
+      capture.start();
+      _inputCapture = capture;
+    } on Object {
+      capture.close();
+      rethrow;
+    }
+  }
+
+  SdlInputCaptureSnapshot getInputCaptureSnapshot() {
+    final capture = _inputCapture;
+    if (capture == null) {
+      throw StateError('No SDL input capture is active.');
+    }
+    return capture.snapshot();
+  }
+
+  void stopInputCapture() {
+    _inputCapture?.close();
+    _inputCapture = null;
+  }
+
+  void dispose() => stopInputCapture();
 
   Future<LoopbackDiagnosticData> runLoopbackDiagnostic() async {
     final stopwatch = Stopwatch()..start();

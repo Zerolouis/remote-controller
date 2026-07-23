@@ -3,6 +3,8 @@
 
 import 'package:flutter/material.dart';
 import 'package:remote_controller/domain/models/app_role.dart';
+import 'package:remote_controller/domain/models/input_capture_snapshot.dart';
+import 'package:remote_controller/domain/models/input_device.dart';
 import 'package:remote_controller/ui/features/home/view_models/home_view_model.dart';
 
 class HomeView extends StatelessWidget {
@@ -193,7 +195,7 @@ class _RoleDashboard extends StatelessWidget {
     final isClient = role == AppRole.client;
     final steps = isClient
         ? const [
-            ('1', '选择手柄', 'ROG Ally X 内置手柄识别将在下一阶段接入 SDL 3。'),
+            ('1', '选择手柄', 'SDL 3 已接入；先确认设备身份和原始数值范围。'),
             ('2', '开启独占', '仅在传输期间通过 HidHide 隔离本机输入。'),
             ('3', '连接电脑', '自动发现并完成六位数加密配对。'),
           ]
@@ -220,7 +222,15 @@ class _RoleDashboard extends StatelessWidget {
               const SizedBox(height: 16),
               Text(role.title, style: Theme.of(context).textTheme.headlineLarge),
               const SizedBox(height: 8),
-              const Text('原生安全会话与本机 loopback 已就绪，硬件与网络后端尚未启用。'),
+              Text(
+                isClient
+                    ? 'SDL 3 实体手柄读取已就绪；独占、网络和远端虚拟手柄尚未启用。'
+                    : '原生安全会话与本机 loopback 已就绪，虚拟手柄和网络后端尚未启用。',
+              ),
+              if (isClient) ...[
+                const SizedBox(height: 20),
+                _InputDeviceCard(viewModel: viewModel),
+              ],
               const SizedBox(height: 20),
               _LoopbackDiagnosticCard(viewModel: viewModel),
               const SizedBox(height: 28),
@@ -241,6 +251,282 @@ class _RoleDashboard extends StatelessWidget {
     );
   }
 }
+
+class _InputDeviceCard extends StatelessWidget {
+  const _InputDeviceCard({required this.viewModel});
+
+  final HomeViewModel viewModel;
+
+  @override
+  Widget build(BuildContext context) {
+    final runtime = viewModel.inputRuntime;
+    final devices = viewModel.inputDevices;
+    final error = viewModel.inputError;
+    final loading = viewModel.isLoadingInputDevices;
+    final capture = viewModel.inputCaptureSnapshot;
+
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(18),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                const Icon(Icons.sports_esports_rounded),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Text(
+                    'SDL 实体手柄',
+                    style: Theme.of(context).textTheme.titleMedium,
+                  ),
+                ),
+                OutlinedButton.icon(
+                  key: const Key('refresh-input-devices'),
+                  onPressed: loading || viewModel.capturedDeviceId != null
+                      ? null
+                      : viewModel.refreshInputDevices,
+                  icon: const Icon(Icons.refresh_rounded),
+                  label: const Text('重新扫描'),
+                ),
+              ],
+            ),
+            const SizedBox(height: 8),
+            Text(
+              runtime == null
+                  ? 'SDL 状态未知'
+                  : runtime.available
+                  ? 'SDL ${runtime.version} · 原生 250 Hz 采样，界面仅显示 10 Hz 快照'
+                  : 'SDL 不可用：${runtime.error}',
+              key: const Key('sdl-runtime-status'),
+              style: TextStyle(
+                color: runtime?.available == true
+                    ? const Color(0xff5eead4)
+                    : const Color(0xffff8fa3),
+              ),
+            ),
+            if (loading) ...[
+              const SizedBox(height: 16),
+              const LinearProgressIndicator(),
+            ] else if (error != null) ...[
+              const SizedBox(height: 14),
+              Text('手柄读取错误：$error', style: const TextStyle(color: Color(0xffff8fa3))),
+            ] else if (devices.isEmpty) ...[
+              const SizedBox(height: 14),
+              const Text('未检测到 SDL 标准手柄。请确认掌机处于手柄模式后重新扫描。'),
+            ] else ...[
+              const SizedBox(height: 14),
+              for (final device in devices) ...[
+                _InputDeviceTile(device: device, viewModel: viewModel),
+                if (device != devices.last) const SizedBox(height: 10),
+              ],
+            ],
+            if (capture != null) ...[
+              const SizedBox(height: 14),
+              _RawCapturePanel(snapshot: capture),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _InputDeviceTile extends StatelessWidget {
+  const _InputDeviceTile({required this.device, required this.viewModel});
+
+  final InputDevice device;
+  final HomeViewModel viewModel;
+
+  @override
+  Widget build(BuildContext context) {
+    final active = viewModel.capturedDeviceId == device.instanceId;
+    final anotherActive = viewModel.capturedDeviceId != null && !active;
+    return DecoratedBox(
+      key: Key('input-device-${device.instanceId}'),
+      decoration: BoxDecoration(
+        color: const Color(0xff0b1220),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+          color: active ? Theme.of(context).colorScheme.primary : Colors.white12,
+        ),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(14),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(device.name, style: Theme.of(context).textTheme.titleSmall),
+                      const SizedBox(height: 4),
+                      Text(
+                        'VID ${_hex(device.vendorId, 4)} · PID ${_hex(device.productId, 4)} · '
+                        '实例 ${device.instanceId}',
+                        style: const TextStyle(color: Colors.white60),
+                      ),
+                    ],
+                  ),
+                ),
+                if (device.isRogAllyX)
+                  const Chip(
+                    avatar: Icon(Icons.verified_rounded, size: 16),
+                    label: Text('ROG Ally X'),
+                  ),
+              ],
+            ),
+            const SizedBox(height: 10),
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: [
+                _CapabilityChip(
+                  label: device.supportsAnalogTriggers ? '模拟扳机' : '扳机能力未知',
+                ),
+                _CapabilityChip(label: device.supportsRumble ? '支持震动' : '震动能力未知'),
+                _CapabilityChip(
+                  label: '按键 0x${_hex(device.supportedButtons, 8)}',
+                ),
+              ],
+            ),
+            const SizedBox(height: 10),
+            Text('GUID ${device.guid}', style: const TextStyle(color: Colors.white60)),
+            if (device.path.isNotEmpty) ...[
+              const SizedBox(height: 4),
+              SelectableText(
+                device.path,
+                style: const TextStyle(color: Colors.white54, fontSize: 12),
+              ),
+            ],
+            const SizedBox(height: 12),
+            OutlinedButton.icon(
+              key: Key(
+                active ? 'stop-input-capture' : 'capture-device-${device.instanceId}',
+              ),
+              onPressed: anotherActive
+                  ? null
+                  : active
+                  ? viewModel.stopInputCapture
+                  : () => viewModel.startInputCapture(device),
+              icon: Icon(active ? Icons.stop_rounded : Icons.monitor_heart_rounded),
+              label: Text(active ? '停止原始值记录' : '记录原始值'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _CapabilityChip extends StatelessWidget {
+  const _CapabilityChip({required this.label});
+
+  final String label;
+
+  @override
+  Widget build(BuildContext context) => DecoratedBox(
+    decoration: BoxDecoration(
+      color: Colors.white.withValues(alpha: 0.06),
+      borderRadius: BorderRadius.circular(999),
+    ),
+    child: Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+      child: Text(label, style: Theme.of(context).textTheme.labelMedium),
+    ),
+  );
+}
+
+class _RawCapturePanel extends StatelessWidget {
+  const _RawCapturePanel({required this.snapshot});
+
+  final InputCaptureSnapshot snapshot;
+
+  @override
+  Widget build(BuildContext context) {
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: const Color(0xff071a19),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: const Color(0xff2dd4bf)),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(14),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              '原始状态 · ${snapshot.sampleCount} 个原生样本 · ${snapshot.state}',
+              key: const Key('input-capture-status'),
+              style: Theme.of(context).textTheme.titleSmall,
+            ),
+            const SizedBox(height: 12),
+            Wrap(
+              spacing: 10,
+              runSpacing: 10,
+              children: [
+                _RawMetric(label: 'Buttons', value: '0x${_hex(snapshot.buttonFlags, 8)}'),
+                _RawMetric(label: 'LT', value: '${snapshot.leftTrigger}'),
+                _RawMetric(label: 'RT', value: '${snapshot.rightTrigger}'),
+                _RawMetric(label: 'LX', value: '${snapshot.leftStickX}'),
+                _RawMetric(label: 'LY', value: '${snapshot.leftStickY}'),
+                _RawMetric(label: 'RX', value: '${snapshot.rightStickX}'),
+                _RawMetric(label: 'RY', value: '${snapshot.rightStickY}'),
+              ],
+            ),
+            const SizedBox(height: 12),
+            Text(
+              '观察范围  LT 0..${snapshot.leftTriggerMax}  '
+              'RT 0..${snapshot.rightTriggerMax}\n'
+              'LX ${snapshot.leftStickXMin}..${snapshot.leftStickXMax}  '
+              'LY ${snapshot.leftStickYMin}..${snapshot.leftStickYMax}\n'
+              'RX ${snapshot.rightStickXMin}..${snapshot.rightStickXMax}  '
+              'RY ${snapshot.rightStickYMin}..${snapshot.rightStickYMax}\n'
+              '已见按键 0x${_hex(snapshot.observedButtonFlags, 8)}',
+              key: const Key('input-capture-ranges'),
+              style: const TextStyle(fontFamily: 'Consolas', height: 1.5),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _RawMetric extends StatelessWidget {
+  const _RawMetric({required this.label, required this.value});
+
+  final String label;
+  final String value;
+
+  @override
+  Widget build(BuildContext context) => SizedBox(
+    width: 105,
+    child: DecoratedBox(
+      decoration: BoxDecoration(
+        color: Colors.black26,
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(9),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(label, style: const TextStyle(color: Colors.white54, fontSize: 11)),
+            const SizedBox(height: 3),
+            Text(value, style: const TextStyle(fontFamily: 'Consolas')),
+          ],
+        ),
+      ),
+    ),
+  );
+}
+
+String _hex(int value, int width) => value.toRadixString(16).toUpperCase().padLeft(width, '0');
 
 class _LoopbackDiagnosticCard extends StatelessWidget {
   const _LoopbackDiagnosticCard({required this.viewModel});

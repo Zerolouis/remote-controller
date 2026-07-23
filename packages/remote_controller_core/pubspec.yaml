@@ -1,6 +1,6 @@
 name: remote_controller_core
 description: Native Windows core and Dart FFI facade for Remote Controller.
-version: 0.2.0
+version: 0.3.0
 repository: https://github.com/Zerolouis/remote-controller
 
 environment:
@@ -8,7 +8,9 @@ environment:
 
 # Add regular dependencies here.
 dependencies:
+  archive: ^4.0.9
   code_assets: ^1.2.1
+  crypto: ^3.0.7
   ffi: ^2.2.0
   hooks: ^2.0.2
   # 0.19.3 requires meta 1.19, while Flutter 3.44.7 pins meta 1.18.

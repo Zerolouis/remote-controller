@@ -40,6 +40,12 @@ enum ButtonFlag : std::uint32_t {
   kB = 0x2000,
   kX = 0x4000,
   kY = 0x8000,
+  kPaddle1 = 0x010000,
+  kPaddle2 = 0x020000,
+  kPaddle3 = 0x040000,
+  kPaddle4 = 0x080000,
+  kTouchpadButton = 0x100000,
+  kMiscButton = 0x200000,
 };
 
 #pragma pack(push, 1)

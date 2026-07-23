@@ -17,6 +17,12 @@ abstract final class GamepadButton {
   static const int b = 0x2000;
   static const int x = 0x4000;
   static const int y = 0x8000;
+  static const int paddle1 = 0x010000;
+  static const int paddle2 = 0x020000;
+  static const int paddle3 = 0x040000;
+  static const int paddle4 = 0x080000;
+  static const int touchpadButton = 0x100000;
+  static const int miscButton = 0x200000;
 }
 
 final class GamepadState {

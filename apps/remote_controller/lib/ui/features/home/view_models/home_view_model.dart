@@ -1,10 +1,14 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // Copyright (C) 2026 Remote Controller contributors
 
+import 'dart:async';
+
 import 'package:flutter/foundation.dart';
 import 'package:remote_controller/data/repositories/core_repository.dart';
 import 'package:remote_controller/domain/models/app_role.dart';
 import 'package:remote_controller/domain/models/core_info.dart';
+import 'package:remote_controller/domain/models/input_capture_snapshot.dart';
+import 'package:remote_controller/domain/models/input_device.dart';
 import 'package:remote_controller/domain/models/loopback_diagnostic.dart';
 
 final class HomeViewModel extends ChangeNotifier {
@@ -18,6 +22,13 @@ final class HomeViewModel extends ChangeNotifier {
   bool _isRunningDiagnostic = false;
   LoopbackDiagnostic? _diagnostic;
   Object? _diagnosticError;
+  InputRuntime? _inputRuntime;
+  List<InputDevice> _inputDevices = const [];
+  bool _isLoadingInputDevices = false;
+  Object? _inputError;
+  int? _capturedDeviceId;
+  InputCaptureSnapshot? _inputCaptureSnapshot;
+  Timer? _capturePollTimer;
 
   CoreInfo? get coreInfo => _coreInfo;
   Object? get coreError => _coreError;
@@ -25,10 +36,17 @@ final class HomeViewModel extends ChangeNotifier {
   bool get isRunningDiagnostic => _isRunningDiagnostic;
   LoopbackDiagnostic? get diagnostic => _diagnostic;
   Object? get diagnosticError => _diagnosticError;
+  InputRuntime? get inputRuntime => _inputRuntime;
+  List<InputDevice> get inputDevices => _inputDevices;
+  bool get isLoadingInputDevices => _isLoadingInputDevices;
+  Object? get inputError => _inputError;
+  int? get capturedDeviceId => _capturedDeviceId;
+  InputCaptureSnapshot? get inputCaptureSnapshot => _inputCaptureSnapshot;
 
   void initialize() {
     try {
       _coreInfo = _coreRepository.getCoreInfo();
+      _inputRuntime = _coreRepository.getInputRuntime();
       _coreError = null;
     } on Object catch (error) {
       _coreInfo = null;
@@ -43,12 +61,16 @@ final class HomeViewModel extends ChangeNotifier {
     }
     _selectedRole = role;
     notifyListeners();
+    if (role == AppRole.client) {
+      unawaited(refreshInputDevices());
+    }
   }
 
   void clearRole() {
     if (_selectedRole == null) {
       return;
     }
+    stopInputCapture();
     _selectedRole = null;
     notifyListeners();
   }
@@ -70,5 +92,77 @@ final class HomeViewModel extends ChangeNotifier {
       _isRunningDiagnostic = false;
       notifyListeners();
     }
+  }
+
+  Future<void> refreshInputDevices() async {
+    if (_isLoadingInputDevices || _capturedDeviceId != null) {
+      return;
+    }
+    _isLoadingInputDevices = true;
+    _inputError = null;
+    notifyListeners();
+    try {
+      _inputDevices = await _coreRepository.enumerateInputDevices();
+    } on Object catch (error) {
+      _inputDevices = const [];
+      _inputError = error;
+    } finally {
+      _isLoadingInputDevices = false;
+      notifyListeners();
+    }
+  }
+
+  void startInputCapture(InputDevice device) {
+    if (_capturedDeviceId != null) {
+      stopInputCapture();
+    }
+    try {
+      _coreRepository.startInputCapture(device.instanceId);
+      _capturedDeviceId = device.instanceId;
+      _inputCaptureSnapshot = _coreRepository.getInputCaptureSnapshot();
+      _inputError = null;
+      _capturePollTimer = Timer.periodic(
+        const Duration(milliseconds: 100),
+        (_) => _pollInputCapture(),
+      );
+    } on Object catch (error) {
+      _capturedDeviceId = null;
+      _inputCaptureSnapshot = null;
+      _inputError = error;
+    }
+    notifyListeners();
+  }
+
+  void stopInputCapture() {
+    _capturePollTimer?.cancel();
+    _capturePollTimer = null;
+    _coreRepository.stopInputCapture();
+    _capturedDeviceId = null;
+    _inputCaptureSnapshot = null;
+    notifyListeners();
+  }
+
+  void _pollInputCapture() {
+    try {
+      final snapshot = _coreRepository.getInputCaptureSnapshot();
+      _inputCaptureSnapshot = snapshot;
+      if (snapshot.state == 'disconnected' || snapshot.state == 'faulted') {
+        _capturePollTimer?.cancel();
+        _capturePollTimer = null;
+      }
+      _inputError = null;
+    } on Object catch (error) {
+      _inputError = error;
+      _capturePollTimer?.cancel();
+      _capturePollTimer = null;
+    }
+    notifyListeners();
+  }
+
+  @override
+  void dispose() {
+    _capturePollTimer?.cancel();
+    _coreRepository.dispose();
+    super.dispose();
   }
 }

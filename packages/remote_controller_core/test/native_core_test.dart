@@ -8,7 +8,39 @@ void main() {
   test('native smoke ABI is available through generated bindings', () {
     expect(RemoteControllerCore.abiVersion, 1);
     expect(RemoteControllerCore.buildInfo, contains('protocol=1'));
-    expect(RemoteControllerCore.buildInfo, contains('backends=loopback'));
+    expect(RemoteControllerCore.buildInfo, contains('sdl3'));
+    expect(RemoteControllerCore.buildInfo, contains('loopback'));
+  });
+
+  test('pinned SDL runtime loads and gamepad enumeration is safe', () {
+    final runtime = SdlInput.runtimeInfo;
+    expect(runtime.available, isTrue, reason: runtime.error);
+    expect(runtime.versionLabel, '3.4.12');
+    expect(runtime.error, isEmpty);
+
+    final devices = SdlInput.enumerateGamepads();
+    for (final device in devices) {
+      expect(device.instanceId, greaterThanOrEqualTo(0));
+      expect(device.name, isNotEmpty);
+      expect(device.guid, hasLength(32));
+    }
+  });
+
+  test('SDL capture reports a missing instance without leaking a handle', () {
+    final capture = SdlInput.createCapture(0xffffffff);
+    addTearDown(capture.close);
+
+    expect(
+      capture.start,
+      throwsA(
+        isA<NativeCoreException>().having(
+          (error) => error.resultCode,
+          'resultCode',
+          4,
+        ),
+      ),
+    );
+    expect(capture.snapshot().state, NativeInputCaptureState.faulted);
   });
 
   test('loopback preserves full raw state and rejects stale sequences', () async {

@@ -5,6 +5,13 @@
 const remoteControllerRecordUseMapping = <String, String>{
   'rc_get_abi_version': 'rc_get_abi_version',
   'rc_get_build_info': 'rc_get_build_info',
+  'rc_input_capture_destroy': 'rc_input_capture_destroy',
+  'rc_input_capture_get_snapshot': 'rc_input_capture_get_snapshot',
+  'rc_input_capture_start': 'rc_input_capture_start',
+  'rc_input_capture_stop': 'rc_input_capture_stop',
+  'rc_sdl_capture_create': 'rc_sdl_capture_create',
+  'rc_sdl_enumerate_gamepads': 'rc_sdl_enumerate_gamepads',
+  'rc_sdl_get_runtime_info': 'rc_sdl_get_runtime_info',
   'rc_session_create_loopback': 'rc_session_create_loopback',
   'rc_session_destroy': 'rc_session_destroy',
   'rc_session_get_snapshot': 'rc_session_get_snapshot',

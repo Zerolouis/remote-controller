@@ -8,6 +8,13 @@ import 'package:ffigen/ffigen.dart';
 const _symbols = <String>{
   'rc_get_abi_version',
   'rc_get_build_info',
+  'rc_input_capture_destroy',
+  'rc_input_capture_get_snapshot',
+  'rc_input_capture_start',
+  'rc_input_capture_stop',
+  'rc_sdl_capture_create',
+  'rc_sdl_enumerate_gamepads',
+  'rc_sdl_get_runtime_info',
   'rc_session_create_loopback',
   'rc_session_destroy',
   'rc_session_get_snapshot',
@@ -45,6 +52,9 @@ void main() {
     ),
     structs: Structs.includeSet({
       'rc_gamepad_state_v1',
+      'rc_input_capture_snapshot_v1',
+      'rc_input_device_info_v1',
+      'rc_sdl_runtime_info_v1',
       'rc_session_snapshot_v1',
     }),
     output: Output(

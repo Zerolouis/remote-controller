@@ -33,5 +33,21 @@ void main() {
       expect(updated.leftStickX, -32768);
       expect(updated.leftStickY, 32767);
     });
+
+    test('Moonlight extension button bits remain 32-bit', () {
+      const state = GamepadState(
+        buttonFlags: GamepadButton.paddle1 | GamepadButton.miscButton,
+        leftTrigger: 0,
+        rightTrigger: 0,
+        leftStickX: 0,
+        leftStickY: 0,
+        rightStickX: 0,
+        rightStickY: 0,
+      );
+
+      expect(state.isPressed(GamepadButton.paddle1), isTrue);
+      expect(state.isPressed(GamepadButton.miscButton), isTrue);
+      expect(state.buttonFlags, greaterThan(0xffff));
+    });
   });
 }
