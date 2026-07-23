@@ -131,7 +131,10 @@ void main() {
     expect(find.textContaining('震动回调 3 次'), findsOneWidget);
     expect(find.textContaining('低频 65535 · 高频 32768'), findsOneWidget);
     expect(
-      find.text('HidHide 尚未启用：实体和虚拟手柄会同时可见，游戏中可能产生双输入。'),
+      find.text(
+        '本机桥接会让实体与虚拟手柄同时可见，仅用于硬件诊断；'
+        '局域网模式不会在掌机创建虚拟手柄。',
+      ),
       findsOneWidget,
     );
 
@@ -171,7 +174,7 @@ void main() {
     expect(find.byKey(const Key('install-vigem-server')), findsNothing);
   });
 
-  testWidgets('starts the LAN server diagnostic listener', (tester) async {
+  testWidgets('starts the trusted LAN server listener', (tester) async {
     await tester.binding.setSurfaceSize(const Size(1280, 1200));
     addTearDown(() => tester.binding.setSurfaceSize(null));
     final repository = _FakeCoreRepository();

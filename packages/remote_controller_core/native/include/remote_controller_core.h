@@ -203,8 +203,8 @@ RC_API rc_result rc_vigem_launch_installer(
     const char* installer_path_utf8,
     rc_vigem_installer_launch_result_v1* out_launch_result);
 
-// Native-only SDL -> ViGEm diagnostic bridge. It does not enable HidHide and
-// must not be used as the production network session ABI.
+// Native-only SDL -> ViGEm diagnostic bridge. Physical and virtual devices are
+// both visible, so it must not be used as the production network session ABI.
 RC_API rc_result rc_local_bridge_create(
     uint32_t instance_id, rc_local_controller_bridge** out_bridge);
 RC_API rc_result rc_local_bridge_start(rc_local_controller_bridge* bridge);
@@ -214,8 +214,7 @@ RC_API rc_result rc_local_bridge_get_snapshot(
 RC_API rc_result rc_local_bridge_stop(rc_local_controller_bridge* bridge);
 RC_API void rc_local_bridge_destroy(rc_local_controller_bridge* bridge);
 
-// Plaintext LAN diagnostic path used to validate the split Client/Server
-// controller chain before pairing and AEAD are enabled. Trusted LAN only.
+// Plaintext Client/Server controller path for trusted LANs only.
 RC_API rc_result rc_lan_client_create(
     uint32_t instance_id, const char* server_address_utf8, uint16_t port,
     rc_lan_controller_client** out_client);

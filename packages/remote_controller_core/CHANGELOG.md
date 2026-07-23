@@ -1,3 +1,8 @@
+## 0.6.1
+
+- Finalize the trusted-LAN MVP scope and remove the unused input-isolation backend.
+- Document that the physical Client controller remains visible and that the current transport is intended for trusted LANs.
+
 ## 0.6.0
 
 - Add a Windows UDP LAN `TransportBackend` with a separate reliable TCP control and rumble channel.

@@ -76,7 +76,7 @@ bool ReceiveAll(const SOCKET socket, void* data, const int length) {
   return true;
 }
 
-protocol::DiagnosticControlFrameV1 MakeControlFrame(
+protocol::PlaintextControlFrameV1 MakeControlFrame(
     const protocol::ControlMessageType type, const std::uint32_t session_id,
     const std::uint64_t sequence = 0,
     const RumbleCommand rumble = {}) {
@@ -95,7 +95,7 @@ protocol::DiagnosticControlFrameV1 MakeControlFrame(
   };
 }
 
-bool ValidControlFrame(const protocol::DiagnosticControlFrameV1& frame,
+bool ValidControlFrame(const protocol::PlaintextControlFrameV1& frame,
                        const protocol::ControlMessageType expected,
                        const std::uint32_t session_id) {
   return frame.magic == protocol::kControlMagic &&
@@ -297,7 +297,7 @@ bool UdpLanTransportBackend::StartClientSockets() {
   const std::uint32_t session_id = RandomSessionId();
   const auto hello = MakeControlFrame(protocol::ControlMessageType::kHello,
                                       session_id);
-  protocol::DiagnosticControlFrameV1 ack{};
+  protocol::PlaintextControlFrameV1 ack{};
   if (!SendAll(control, &hello, sizeof(hello)) ||
       !ReceiveAll(control, &ack, sizeof(ack)) ||
       !ValidControlFrame(ack, protocol::ControlMessageType::kHelloAck,
@@ -309,7 +309,7 @@ bool UdpLanTransportBackend::StartClientSockets() {
       CloseSocket(control_socket_);
     }
     SetError(error == 0 ? WSAEPROTONOSUPPORT : error,
-             "The diagnostic control handshake failed.");
+             "The trusted-LAN control handshake failed.");
     return false;
   }
   if (stop_requested_) {
@@ -405,7 +405,7 @@ bool UdpLanTransportBackend::StartServerSockets() {
     control_socket_ = control;
   }
 
-  protocol::DiagnosticControlFrameV1 hello{};
+  protocol::PlaintextControlFrameV1 hello{};
   if (!ReceiveAll(control, &hello, sizeof(hello)) || hello.session_id == 0 ||
       !ValidControlFrame(hello, protocol::ControlMessageType::kHello,
                          hello.session_id)) {
@@ -417,7 +417,7 @@ bool UdpLanTransportBackend::StartServerSockets() {
       }
     }
     SetError(error == 0 ? WSAEPROTONOSUPPORT : error,
-             "The diagnostic client handshake was rejected.");
+             "The trusted-LAN client handshake was rejected.");
     return false;
   }
   const auto ack = MakeControlFrame(protocol::ControlMessageType::kHelloAck,
@@ -430,7 +430,7 @@ bool UdpLanTransportBackend::StartServerSockets() {
         CloseSocket(control_socket_);
       }
     }
-    SetError(error, "The diagnostic handshake response could not be sent.");
+    SetError(error, "The trusted-LAN handshake response could not be sent.");
     return false;
   }
   if (stop_requested_) {
@@ -466,7 +466,7 @@ bool UdpLanTransportBackend::SendState(
       protocol::kInputMagic,
       protocol::kProtocolVersion,
       static_cast<std::uint8_t>(protocol::MessageType::kFullState),
-      protocol::kInputFlagDiagnosticPlaintext,
+      protocol::kInputFlagTrustedLanPlaintext,
       protocol::kInputDatagramSize,
       protocol::kInputHeaderSize,
       session_id_.load(),
@@ -545,7 +545,7 @@ void UdpLanTransportBackend::ClientControlLoop() noexcept {
     if (!WaitForSocket(control, false, kControlPollPeriod)) {
       continue;
     }
-    protocol::DiagnosticControlFrameV1 frame{};
+    protocol::PlaintextControlFrameV1 frame{};
     if (!ReceiveAll(control, &frame, sizeof(frame))) {
       SignalDisconnected(WSAGetLastError(),
                          "The TCP control channel was closed.");
@@ -564,11 +564,11 @@ void UdpLanTransportBackend::ClientControlLoop() noexcept {
       }
     } else if (ValidControlFrame(frame, protocol::ControlMessageType::kStop,
                                  session_id_.load())) {
-      SignalDisconnected(0, "The server stopped the diagnostic session.");
+      SignalDisconnected(0, "The server stopped the trusted-LAN session.");
       break;
     } else {
       SignalDisconnected(WSAEPROTONOSUPPORT,
-                         "An invalid diagnostic control frame was received.");
+                         "An invalid plaintext control frame was received.");
       break;
     }
   }
@@ -613,7 +613,7 @@ void UdpLanTransportBackend::ServerControlLoop() noexcept {
     if (!WaitForSocket(control, false, kControlPollPeriod)) {
       continue;
     }
-    protocol::DiagnosticControlFrameV1 frame{};
+    protocol::PlaintextControlFrameV1 frame{};
     if (!ReceiveAll(control, &frame, sizeof(frame))) {
       SignalDisconnected(WSAGetLastError(),
                          "The TCP control channel was closed.");
@@ -625,11 +625,11 @@ void UdpLanTransportBackend::ServerControlLoop() noexcept {
       last_heartbeat = std::chrono::steady_clock::now();
     } else if (ValidControlFrame(frame, protocol::ControlMessageType::kStop,
                                  session_id_.load())) {
-      SignalDisconnected(0, "The client stopped the diagnostic session.");
+      SignalDisconnected(0, "The client stopped the trusted-LAN session.");
       break;
     } else {
       SignalDisconnected(WSAEPROTONOSUPPORT,
-                         "An invalid diagnostic control frame was received.");
+                         "An invalid plaintext control frame was received.");
       break;
     }
   }
@@ -669,7 +669,7 @@ void UdpLanTransportBackend::ServerInputLoop() noexcept {
         packet.header.version == protocol::kProtocolVersion &&
         packet.header.message_type ==
             static_cast<std::uint8_t>(protocol::MessageType::kFullState) &&
-        packet.header.flags == protocol::kInputFlagDiagnosticPlaintext &&
+        packet.header.flags == protocol::kInputFlagTrustedLanPlaintext &&
         packet.header.packet_length == protocol::kInputDatagramSize &&
         packet.header.header_length == protocol::kInputHeaderSize &&
         packet.header.session_id == session_id_.load() &&

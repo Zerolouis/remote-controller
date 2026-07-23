@@ -198,12 +198,12 @@ class _RoleDashboard extends StatelessWidget {
     final steps = isClient
         ? const [
             ('1', '选择手柄', 'SDL 3 已接入；先确认设备身份和原始数值范围。'),
-            ('2', '开启独占', '仅在传输期间通过 HidHide 隔离本机输入。'),
-            ('3', '连接电脑', '自动发现并完成六位数加密配对。'),
+            ('2', '填写电脑地址', '输入同一局域网内电脑的 IPv4 地址或主机名。'),
+            ('3', '开始传输', '选择手柄并启动完整状态与震动双向链路。'),
           ]
         : const [
             ('1', '检查驱动', '检测 ViGEmBus；缺失时只提供官方安装入口。'),
-            ('2', '等待配对', '监听局域网发现和加密控制通道。'),
+            ('2', '启动监听', '在 TCP/UDP 26760 等待单个可信局域网客户端。'),
             ('3', '创建手柄', '收到输入后创建单个虚拟 Xbox 360 手柄。'),
           ];
 
@@ -225,9 +225,7 @@ class _RoleDashboard extends StatelessWidget {
               Text(role.title, style: Theme.of(context).textTheme.headlineLarge),
               const SizedBox(height: 8),
               Text(
-                isClient
-                    ? 'SDL 3 读取、本机桥接和局域网诊断发送已就绪；HidHide 尚未启用。'
-                    : 'ViGEm 虚拟 Xbox 360 后端和局域网诊断接收已就绪。',
+                isClient ? 'SDL 3 读取、本机桥接和可信局域网发送已就绪。' : 'ViGEm 虚拟 Xbox 360 后端和可信局域网接收已就绪。',
               ),
               if (isClient) ...[
                 const SizedBox(height: 20),
@@ -237,7 +235,7 @@ class _RoleDashboard extends StatelessWidget {
                 _VirtualControllerCard(viewModel: viewModel),
               ],
               const SizedBox(height: 20),
-              _LanDiagnosticCard(isClient: isClient, viewModel: viewModel),
+              _LanSessionCard(isClient: isClient, viewModel: viewModel),
               const SizedBox(height: 20),
               _LoopbackDiagnosticCard(viewModel: viewModel),
               const SizedBox(height: 28),
@@ -502,8 +500,8 @@ class _InputDeviceTile extends StatelessWidget {
   }
 }
 
-class _LanDiagnosticCard extends StatelessWidget {
-  const _LanDiagnosticCard({
+class _LanSessionCard extends StatelessWidget {
+  const _LanSessionCard({
     required this.isClient,
     required this.viewModel,
   });
@@ -532,17 +530,17 @@ class _LanDiagnosticCard extends StatelessWidget {
                 const SizedBox(width: 10),
                 Expanded(
                   child: Text(
-                    '局域网 Client–Server 诊断链路',
+                    '局域网 Client–Server 链路',
                     style: Theme.of(context).textTheme.titleMedium,
                   ),
                 ),
-                const Chip(label: Text('未加密诊断版')),
+                const Chip(label: Text('可信 LAN · 未加密')),
               ],
             ),
             const SizedBox(height: 10),
             const Text(
               'TCP 26760 负责握手、心跳、停止和震动；UDP 26760 发送 64 字节完整状态。'
-              '当前没有配对或 AEAD，只能在可信局域网测试。',
+              '当前没有配对或 AEAD，只支持用户信任的家庭或个人局域网。',
               style: TextStyle(color: Color(0xfffde68a)),
             ),
             const SizedBox(height: 14),
@@ -563,11 +561,6 @@ class _LanDiagnosticCard extends StatelessWidget {
               Text(
                 active ? '已使用所选手柄启动发送；请在设备卡片中停止。' : '填写电脑地址后，在上方目标手柄卡片点击“发送到电脑”。',
                 style: const TextStyle(color: Colors.white70),
-              ),
-              const SizedBox(height: 8),
-              const Text(
-                'HidHide 尚未启用，本机程序仍可能同时收到实体手柄输入。',
-                style: TextStyle(color: Color(0xffffb4c0)),
               ),
             ] else ...[
               FilledButton.icon(
@@ -840,7 +833,8 @@ class _LocalBridgePanel extends StatelessWidget {
             ),
             const SizedBox(height: 8),
             const Text(
-              'HidHide 尚未启用：实体和虚拟手柄会同时可见，游戏中可能产生双输入。',
+              '本机桥接会让实体与虚拟手柄同时可见，仅用于硬件诊断；'
+              '局域网模式不会在掌机创建虚拟手柄。',
               style: TextStyle(color: Color(0xfffde68a)),
             ),
             const SizedBox(height: 12),

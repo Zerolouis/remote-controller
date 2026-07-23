@@ -10,7 +10,7 @@ extension AppRoleLabel on AppRole {
   };
 
   String get description => switch (this) {
-    AppRole.client => '读取并独占掌机手柄，将完整原始状态发送到局域网电脑。',
+    AppRole.client => '读取掌机手柄，将完整原始状态发送到可信局域网电脑。',
     AppRole.server => '接收手柄状态，创建虚拟 Xbox 手柄并回传震动。',
   };
 }

@@ -9,7 +9,6 @@ This repository contains original compatibility-oriented implementation plus sma
 | moonlight-stream/moonlight-common-c | `703a06946861ff82cd33e5e13c59c1b017f7ded9` | GPL-3.0 | Button masks, controller packets and capability negotiation reference |
 | LizardByte/Virtual-Gamepad-Emulation-Client | `8d71f6740ffff4671cdadbca255ce528e3cd3fef` / upstream `1.21.222.0` | MIT | Compiled-in virtual Xbox 360 client implementation |
 | nefarius/ViGEmBus | 1.22.0 / `v1.22.0` | BSD-3-Clause | External virtual gamepad driver; downloaded from the official release only after explicit user action, never bundled |
-| nefarius/HidHide | `2b950fd9393e1644b4199f6eb4999e1720f0c6e9` | MIT | External device hiding driver and configuration contract; not redistributed |
 | libsdl-org/SDL | 3.4.12 / `f87239e71e42da91ca317a12eefb82cfbf3393eb` | zlib | Physical controller headers and bundled Windows runtime |
 | Moonlight ENet fork | `aca87840b57f045a1f7f9299e4b1b9b8e2a5e2f1` | MIT | Candidate reliable UDP transport reference |
 

@@ -239,7 +239,7 @@ void main() {
     expect(released.outputState.buttonFlags, 0);
   });
 
-  test('LAN diagnostic server accepts full UDP state and watchdog neutralizes', () async {
+  test('trusted LAN server accepts full UDP state and watchdog neutralizes', () async {
     if (!VigemController.runtimeInfo.available) {
       return;
     }

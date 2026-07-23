@@ -23,9 +23,9 @@ namespace {
 
 constexpr std::uint32_t kAbiVersion = 1;
 constexpr char kBuildInfo[] =
-    "remote-controller-core/0.6.0; abi=1; protocol=1; "
+    "remote-controller-core/0.6.1; abi=1; protocol=1; "
     "backends=sdl3,vigem-x360,udp-lan,loopback,memory-virtual; "
-    "features=lan-diagnostic,vigem-installer-launch; "
+    "features=lan-trusted-plaintext,vigem-installer-launch; "
     "watchdog=100ms-default";
 
 remote_controller::protocol::GamepadStateV1 ToNativeState(

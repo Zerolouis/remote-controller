@@ -17,7 +17,7 @@ inline constexpr std::uint16_t kInputHeaderSize = 32;
 inline constexpr std::uint16_t kControlPort = 26760;
 inline constexpr std::uint16_t kInputPort = 26760;
 inline constexpr std::uint16_t kDiscoveryPort = 26761;
-inline constexpr std::uint16_t kInputFlagDiagnosticPlaintext = 0x0001;
+inline constexpr std::uint16_t kInputFlagTrustedLanPlaintext = 0x0001;
 inline constexpr std::uint32_t kControlMagic = 0x31434352;  // "RCC1" in LE.
 inline constexpr std::uint16_t kControlFrameSize = 32;
 
@@ -91,9 +91,9 @@ struct InputDatagramV1 {
   std::array<std::uint8_t, 16> authentication_tag;
 };
 
-// Temporary M2 diagnostic control frame. It deliberately has no encryption
-// and must not be accepted by the future paired production transport.
-struct DiagnosticControlFrameV1 {
+// Trusted-LAN MVP control frame. It deliberately has no encryption and must
+// not be exposed to untrusted or internet-routed networks.
+struct PlaintextControlFrameV1 {
   std::uint32_t magic;
   std::uint8_t version;
   std::uint8_t message_type;
@@ -112,7 +112,7 @@ struct DiagnosticControlFrameV1 {
 static_assert(sizeof(InputPacketHeaderV1) == kInputHeaderSize);
 static_assert(sizeof(GamepadStateV1) == 16);
 static_assert(sizeof(InputDatagramV1) == kInputDatagramSize);
-static_assert(sizeof(DiagnosticControlFrameV1) == kControlFrameSize);
+static_assert(sizeof(PlaintextControlFrameV1) == kControlFrameSize);
 static_assert(std::is_trivially_copyable_v<GamepadStateV1>);
 
 }  // namespace remote_controller::protocol

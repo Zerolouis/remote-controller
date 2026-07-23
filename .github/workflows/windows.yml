@@ -1,0 +1,85 @@
+name: Windows CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: windows-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  analyze-test-build:
+    runs-on: windows-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: 3.44.7
+          channel: stable
+          cache: true
+
+      - name: Enable Windows desktop
+        run: flutter config --enable-windows-desktop
+
+      - name: Resolve core dependencies
+        working-directory: packages/remote_controller_core
+        run: flutter pub get
+
+      - name: Verify generated FFI bindings
+        working-directory: packages/remote_controller_core
+        shell: pwsh
+        run: |
+          dart run tool/ffigen.dart
+          git diff --exit-code -- lib/src/third_party/remote_controller_core.g.dart lib/src/third_party/remote_controller_core.record_use_mapping.g.dart
+
+      - name: Analyze core
+        working-directory: packages/remote_controller_core
+        run: flutter analyze --fatal-infos
+
+      - name: Test core
+        working-directory: packages/remote_controller_core
+        run: flutter test
+
+      - name: Resolve app dependencies
+        working-directory: apps/remote_controller
+        run: flutter pub get
+
+      - name: Analyze app
+        working-directory: apps/remote_controller
+        run: flutter analyze --fatal-infos
+
+      - name: Test app
+        working-directory: apps/remote_controller
+        run: flutter test
+
+      - name: Build Windows release
+        working-directory: apps/remote_controller
+        run: flutter build windows --release
+
+      - name: Verify release contents
+        shell: pwsh
+        run: |
+          $release = 'apps/remote_controller/build/windows/x64/runner/Release'
+          $unexpected = Get-ChildItem -LiteralPath $release -Recurse -File | Where-Object { $_.Name -match 'ViGEm|installer' }
+          if ($unexpected) {
+            $unexpected | ForEach-Object { Write-Error "Unexpected release file: $($_.FullName)" }
+            exit 1
+          }
+
+      - name: Upload unsigned Windows artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: remote-controller-windows-x64-unsigned
+          path: apps/remote_controller/build/windows/x64/runner/Release/
+          if-no-files-found: error

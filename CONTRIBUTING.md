@@ -1,6 +1,6 @@
 # Contributing
 
-Remote Controller is in an architecture-first MVP phase. Please open an issue before adding a new input, transport, isolation, or virtual-controller backend.
+Remote Controller has a working trusted-LAN MVP. Please open an issue before adding a new input, transport, or virtual-controller backend.
 
 ## Development prerequisites
 
@@ -12,7 +12,9 @@ Remote Controller is in an architecture-first MVP phase. Please open an issue be
 
 ## Local checks
 
-From `packages/remote_controller_core`, regenerate bindings with `dart run tool/ffigen.dart`, then run `dart analyze` and `flutter test`. From `apps/remote_controller`, run `flutter analyze`, `flutter test`, and `flutter build windows`.
+From `packages/remote_controller_core`, regenerate bindings with `dart run tool/ffigen.dart`, then run `flutter analyze` and `flutter test`. From `apps/remote_controller`, run `flutter analyze`, `flutter test`, and `flutter build windows --release`.
+
+Do not add HidHide or another automatic input-hiding driver. The accepted MVP boundary leaves the physical controller visible on the handheld and documents that behavior to users.
 
 On localized Windows installations, `native_toolchain_c 0.19.2` may fail to auto-detect Visual Studio from a plain `dart test`. Using `flutter test` supplies the compiler configuration explicitly and is the supported validation path until the upstream encoding issue is resolved.
 
