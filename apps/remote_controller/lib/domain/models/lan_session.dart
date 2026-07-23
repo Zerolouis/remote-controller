@@ -23,6 +23,7 @@ final class LanSessionStatus {
     required this.peerAddress,
     required this.lastError,
     required this.error,
+    required this.pairingKeyMismatch,
   });
 
   final String state;
@@ -45,4 +46,5 @@ final class LanSessionStatus {
   final String peerAddress;
   final int lastError;
   final String error;
+  final bool pairingKeyMismatch;
 }

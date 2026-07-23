@@ -21,6 +21,13 @@ inline constexpr std::uint16_t kInputFlagTrustedLanPlaintext = 0x0001;
 inline constexpr std::uint32_t kControlMagic = 0x31434352;  // "RCC1" in LE.
 inline constexpr std::uint16_t kControlFrameSize = 32;
 
+// Reason codes carried in the `sequence` field of a kError control frame.
+inline constexpr std::uint64_t kControlErrorPairingKeyMismatch = 1;
+
+// Sentinel stored in snapshot last_error when a LAN handshake fails because the
+// client presented a wrong pairing key. Deliberately outside the Winsock range.
+inline constexpr std::uint32_t kPairingKeyMismatchError = 0x52430001;  // "RC"|1
+
 enum class MessageType : std::uint8_t {
   kFullState = 1,
   kRumble = 2,
@@ -99,7 +106,9 @@ struct PlaintextControlFrameV1 {
   std::uint8_t message_type;
   std::uint16_t flags;
   std::uint16_t frame_length;
-  std::uint16_t reserved;
+  // 4-digit decimal pairing code (0..9999). Only meaningful in kHello; 0 in
+  // every other message type. Plain-text confirmation code, not a secret.
+  std::uint16_t pairing_key;
   std::uint32_t session_id;
   std::uint64_t sequence;
   std::uint16_t low_frequency_motor;

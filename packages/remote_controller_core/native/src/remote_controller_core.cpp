@@ -16,6 +16,7 @@
 #include "input_capture.h"
 #include "lan_controller_session.h"
 #include "local_controller_bridge.h"
+#include "pairing_key_store.h"
 #include "session.h"
 #include "vigem_installer.h"
 
@@ -23,9 +24,9 @@ namespace {
 
 constexpr std::uint32_t kAbiVersion = 1;
 constexpr char kBuildInfo[] =
-    "remote-controller-core/0.6.1; abi=1; protocol=1; "
+    "remote-controller-core/0.7.0; abi=1; protocol=1; "
     "backends=sdl3,vigem-x360,udp-lan,loopback,memory-virtual; "
-    "features=lan-trusted-plaintext,vigem-installer-launch; "
+    "features=lan-trusted-plaintext,lan-pairing-key,vigem-installer-launch; "
     "watchdog=100ms-default";
 
 remote_controller::protocol::GamepadStateV1 ToNativeState(
@@ -114,12 +115,13 @@ struct rc_local_controller_bridge {
 struct rc_lan_controller_client {
   rc_lan_controller_client(const std::uint32_t instance_id,
                            std::string server_address,
-                           const std::uint16_t port)
+                           const std::uint16_t port,
+                           const std::uint16_t pairing_key)
       : implementation(
             std::make_unique<remote_controller::backends::SdlInputBackend>(),
             std::make_unique<remote_controller::backends::
                                  UdpLanTransportBackend>(
-                std::move(server_address), port),
+                std::move(server_address), port, pairing_key),
             std::to_string(instance_id)) {}
 
   remote_controller::LanControllerClient implementation;
@@ -387,9 +389,10 @@ extern "C" RC_API void rc_local_bridge_destroy(
 
 extern "C" RC_API rc_result rc_lan_client_create(
     const std::uint32_t instance_id, const char* server_address_utf8,
-    const std::uint16_t port, rc_lan_controller_client** out_client) {
+    const std::uint16_t port, const std::uint16_t pairing_key,
+    rc_lan_controller_client** out_client) {
   if (server_address_utf8 == nullptr || server_address_utf8[0] == '\0' ||
-      port == 0 || out_client == nullptr) {
+      port == 0 || pairing_key > 9999 || out_client == nullptr) {
     return RC_RESULT_INVALID_ARGUMENT;
   }
   *out_client = nullptr;
@@ -397,8 +400,8 @@ extern "C" RC_API rc_result rc_lan_client_create(
            .available) {
     return RC_RESULT_BACKEND_FAILURE;
   }
-  auto client = new (std::nothrow)
-      rc_lan_controller_client(instance_id, server_address_utf8, port);
+  auto client = new (std::nothrow) rc_lan_controller_client(
+      instance_id, server_address_utf8, port, pairing_key);
   if (client == nullptr) {
     return RC_RESULT_BACKEND_FAILURE;
   }
@@ -485,6 +488,23 @@ extern "C" RC_API rc_result rc_lan_server_stop(
 extern "C" RC_API void rc_lan_server_destroy(
     rc_lan_controller_server* server) {
   delete server;
+}
+
+extern "C" RC_API rc_result rc_pairing_get_code(std::uint16_t* out_code) {
+  if (out_code == nullptr) {
+    return RC_RESULT_INVALID_ARGUMENT;
+  }
+  *out_code = remote_controller::PairingKeyStore::Get();
+  return RC_RESULT_OK;
+}
+
+extern "C" RC_API rc_result rc_pairing_regenerate(
+    std::uint16_t* out_new_code) {
+  if (out_new_code == nullptr) {
+    return RC_RESULT_INVALID_ARGUMENT;
+  }
+  *out_new_code = remote_controller::PairingKeyStore::Regenerate();
+  return RC_RESULT_OK;
 }
 
 extern "C" RC_API rc_result rc_session_create_loopback(

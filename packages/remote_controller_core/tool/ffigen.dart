@@ -27,6 +27,8 @@ const _symbols = <String>{
   'rc_lan_server_get_snapshot',
   'rc_lan_server_start',
   'rc_lan_server_stop',
+  'rc_pairing_get_code',
+  'rc_pairing_regenerate',
   'rc_sdl_capture_create',
   'rc_sdl_enumerate_gamepads',
   'rc_sdl_get_runtime_info',

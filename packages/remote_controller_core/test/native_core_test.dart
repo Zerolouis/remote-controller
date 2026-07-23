@@ -2,14 +2,59 @@
 // Copyright (C) 2026 Remote Controller contributors
 
 import 'dart:async';
+import 'dart:ffi';
 import 'dart:io';
 import 'dart:isolate';
 import 'dart:typed_data';
 
+import 'package:ffi/ffi.dart';
 import 'package:remote_controller_core/remote_controller_core.dart';
 import 'package:test/test.dart';
 
+typedef _SetEnvironmentVariableWNative = Int32 Function(
+  Pointer<Utf16>,
+  Pointer<Utf16>,
+);
+typedef _SetEnvironmentVariableWDart = int Function(
+  Pointer<Utf16>,
+  Pointer<Utf16>,
+);
+
+final _setEnvironmentVariableW = DynamicLibrary.open('kernel32.dll')
+    .lookup<NativeFunction<_SetEnvironmentVariableWNative>>(
+      'SetEnvironmentVariableW',
+    )
+    .asFunction<_SetEnvironmentVariableWDart>();
+
+// Points the native PairingKeyStore at an isolated temp file so pairing tests
+// never touch the developer's real %APPDATA% store. Uses the Win32 API because
+// the native side reads the live process environment block.
+void _setPairingStorePath(String? path) {
+  final name = 'REMOTE_CONTROLLER_PAIRING_FILE'.toNativeUtf16();
+  final value = path?.toNativeUtf16() ?? nullptr;
+  try {
+    _setEnvironmentVariableW(name, value);
+  } finally {
+    malloc.free(name);
+    if (value != nullptr) {
+      malloc.free(value);
+    }
+  }
+}
+
 void main() {
+  late Directory pairingTempDir;
+  setUpAll(() {
+    pairingTempDir = Directory.systemTemp.createTempSync('rc_pairing_test_');
+    _setPairingStorePath('${pairingTempDir.path}\\pairing_key.json');
+  });
+  tearDownAll(() {
+    _setPairingStorePath(null);
+    if (pairingTempDir.existsSync()) {
+      pairingTempDir.deleteSync(recursive: true);
+    }
+  });
+
   test('native smoke ABI is available through generated bindings', () {
     expect(RemoteControllerCore.abiVersion, 1);
     expect(RemoteControllerCore.buildInfo, contains('protocol=1'));
@@ -271,7 +316,13 @@ void main() {
     addTearDown(() => control?.destroy());
 
     const sessionId = 0x12345678;
-    control!.add(_controlFrame(type: 1, sessionId: sessionId));
+    control!.add(
+      _controlFrame(
+        type: 1,
+        sessionId: sessionId,
+        pairingKey: LanController.pairingCode(),
+      ),
+    );
     await control.flush();
     final ack = await _readBytes(control, 32);
     expect(ByteData.sublistView(ack).getUint8(5), 2);
@@ -325,6 +376,7 @@ void main() {
       instanceId: device.instanceId,
       serverAddress: InternetAddress.loopbackIPv4.address,
       port: port,
+      pairingKey: LanController.pairingCode(),
     );
     addTearDown(server.close);
     addTearDown(client.close);
@@ -343,16 +395,86 @@ void main() {
     expect(connectedServer.state, LanSessionState.running);
     expect(connectedServer.latestSequence, greaterThan(0));
   });
+
+  test('pairing code persists within the store and regenerates on demand', () {
+    final first = LanController.pairingCode();
+    expect(first, inInclusiveRange(0, 9999));
+    expect(LanController.pairingCode(), first);
+    final regenerated = LanController.regeneratePairingCode();
+    expect(regenerated, inInclusiveRange(0, 9999));
+    expect(LanController.pairingCode(), regenerated);
+  });
+
+  test('server rejects a wrong pairing key and keeps listening', () async {
+    if (!VigemController.runtimeInfo.available) {
+      return;
+    }
+    final portProbe = await ServerSocket.bind(InternetAddress.loopbackIPv4, 0);
+    final port = portProbe.port;
+    await portProbe.close();
+
+    final code = LanController.pairingCode();
+    final server = LanController.createServer(
+      port: port,
+      inputTimeout: const Duration(milliseconds: 80),
+    );
+    addTearDown(server.close);
+    server.start();
+
+    final wrong = await _connectControl(port);
+    addTearDown(wrong.destroy);
+    wrong.add(
+      _controlFrame(
+        type: 1,
+        sessionId: 0xAAAA0001,
+        pairingKey: (code + 1) % 10000,
+      ),
+    );
+    await wrong.flush();
+    final rejection = await _readBytes(wrong, 32);
+    final rejectionView = ByteData.sublistView(rejection);
+    expect(rejectionView.getUint8(5), 6); // ControlMessageType::kError
+    expect(rejectionView.getUint64(16, Endian.little), 1); // mismatch reason
+    expect(server.snapshot().state, LanSessionState.running);
+    wrong.destroy();
+
+    final ok = await _connectControl(port);
+    addTearDown(ok.destroy);
+    ok.add(_controlFrame(type: 1, sessionId: 0xBBBB0002, pairingKey: code));
+    await ok.flush();
+    final ack = await _readBytes(ok, 32);
+    expect(ByteData.sublistView(ack).getUint8(5), 2); // kHelloAck
+  });
 }
 
-Uint8List _controlFrame({required int type, required int sessionId}) {
+Future<Socket> _connectControl(int port) async {
+  final deadline = DateTime.now().add(const Duration(seconds: 2));
+  while (DateTime.now().isBefore(deadline)) {
+    try {
+      return await Socket.connect(
+        InternetAddress.loopbackIPv4,
+        port,
+        timeout: const Duration(milliseconds: 200),
+      );
+    } on SocketException {
+      await Future<void>.delayed(const Duration(milliseconds: 20));
+    }
+  }
+  throw TestFailure('Could not connect to the LAN control port.');
+}
+
+Uint8List _controlFrame({
+  required int type,
+  required int sessionId,
+  int pairingKey = 0,
+}) {
   final data = ByteData(32)
     ..setUint32(0, 0x31434352, Endian.little)
     ..setUint8(4, 1)
     ..setUint8(5, type)
     ..setUint16(6, 0, Endian.little)
     ..setUint16(8, 32, Endian.little)
-    ..setUint16(10, 0, Endian.little)
+    ..setUint16(10, pairingKey, Endian.little)
     ..setUint32(12, sessionId, Endian.little);
   return data.buffer.asUint8List();
 }

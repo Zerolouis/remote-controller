@@ -35,6 +35,11 @@ typedef int32_t rc_result;
 #define RC_RESULT_BACKEND_FAILURE 4
 #define RC_RESULT_NOT_FOUND 5
 #define RC_RESULT_BUFFER_TOO_SMALL 6
+#define RC_RESULT_PAIRING_KEY_MISMATCH 7
+
+// Value stored in rc_lan_session_snapshot_v1.last_error when a trusted-LAN
+// handshake failed because the client presented a wrong pairing key.
+#define RC_LAN_ERROR_PAIRING_KEY_MISMATCH 0x52430001u
 
 #define RC_SESSION_STATE_CREATED 0
 #define RC_SESSION_STATE_RUNNING 1
@@ -217,7 +222,7 @@ RC_API void rc_local_bridge_destroy(rc_local_controller_bridge* bridge);
 // Plaintext Client/Server controller path for trusted LANs only.
 RC_API rc_result rc_lan_client_create(
     uint32_t instance_id, const char* server_address_utf8, uint16_t port,
-    rc_lan_controller_client** out_client);
+    uint16_t pairing_key, rc_lan_controller_client** out_client);
 RC_API rc_result rc_lan_client_start(rc_lan_controller_client* client);
 RC_API rc_result rc_lan_client_get_snapshot(
     rc_lan_controller_client* client,
@@ -234,6 +239,13 @@ RC_API rc_result rc_lan_server_get_snapshot(
     rc_lan_session_snapshot_v1* out_snapshot);
 RC_API rc_result rc_lan_server_stop(rc_lan_controller_server* server);
 RC_API void rc_lan_server_destroy(rc_lan_controller_server* server);
+
+// 4-digit decimal pairing code (0..9999) used to confirm a trusted-LAN client
+// means to connect to this server. The code is generated once and persisted
+// per user; rc_pairing_get_code returns the current code (generating it on
+// first use) and rc_pairing_regenerate replaces it, invalidating the old one.
+RC_API rc_result rc_pairing_get_code(uint16_t* out_code);
+RC_API rc_result rc_pairing_regenerate(uint16_t* out_new_code);
 
 // Creates a native-only loopback session used to validate the common input
 // pipeline before hardware and network backends are attached.

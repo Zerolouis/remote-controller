@@ -150,8 +150,8 @@ final class NativeCoreRepository implements CoreRepository {
   void stopLocalBridge() => _service.stopLocalBridge();
 
   @override
-  void startLanClient(int instanceId, String serverAddress) =>
-      _service.startLanClient(instanceId, serverAddress);
+  void startLanClient(int instanceId, String serverAddress, {int pairingKey = 0}) =>
+      _service.startLanClient(instanceId, serverAddress, pairingKey: pairingKey);
 
   @override
   LanSessionStatus getLanClientStatus() => _mapLanSession(_service.getLanClientStatus());
@@ -167,6 +167,12 @@ final class NativeCoreRepository implements CoreRepository {
 
   @override
   void stopLanServer() => _service.stopLanServer();
+
+  @override
+  int pairingCode() => _service.pairingCode();
+
+  @override
+  int regeneratePairingCode() => _service.regeneratePairingCode();
 
   @override
   void dispose() => _service.dispose();
@@ -194,6 +200,7 @@ final class NativeCoreRepository implements CoreRepository {
       peerAddress: snapshot.peerAddress,
       lastError: snapshot.lastError,
       error: snapshot.error,
+      pairingKeyMismatch: snapshot.pairingKeyMismatch,
     );
   }
 }

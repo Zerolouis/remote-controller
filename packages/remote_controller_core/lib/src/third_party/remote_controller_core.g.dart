@@ -113,6 +113,7 @@ external void rc_local_bridge_destroy(
     ffi.Uint32,
     ffi.Pointer<ffi.Char>,
     ffi.Uint16,
+    ffi.Uint16,
     ffi.Pointer<ffi.Pointer<rc_lan_controller_client>>,
   )
 >()
@@ -120,6 +121,7 @@ external int rc_lan_client_create(
   int instance_id,
   ffi.Pointer<ffi.Char> server_address_utf8,
   int port,
+  int pairing_key,
   ffi.Pointer<ffi.Pointer<rc_lan_controller_client>> out_client,
 );
 
@@ -176,6 +178,16 @@ external int rc_lan_server_stop(
 @ffi.Native<ffi.Void Function(ffi.Pointer<rc_lan_controller_server>)>()
 external void rc_lan_server_destroy(
   ffi.Pointer<rc_lan_controller_server> server,
+);
+
+@ffi.Native<ffi.Int32 Function(ffi.Pointer<ffi.Uint16>)>()
+external int rc_pairing_get_code(
+  ffi.Pointer<ffi.Uint16> out_code,
+);
+
+@ffi.Native<ffi.Int32 Function(ffi.Pointer<ffi.Uint16>)>()
+external int rc_pairing_regenerate(
+  ffi.Pointer<ffi.Uint16> out_new_code,
 );
 
 @ffi.Native<ffi.Int32 Function(ffi.Uint32, ffi.Pointer<ffi.Pointer<rc_session>>)>()

@@ -24,6 +24,8 @@ const remoteControllerRecordUseMapping = <String, String>{
   'rc_local_bridge_get_snapshot': 'rc_local_bridge_get_snapshot',
   'rc_local_bridge_start': 'rc_local_bridge_start',
   'rc_local_bridge_stop': 'rc_local_bridge_stop',
+  'rc_pairing_get_code': 'rc_pairing_get_code',
+  'rc_pairing_regenerate': 'rc_pairing_regenerate',
   'rc_sdl_capture_create': 'rc_sdl_capture_create',
   'rc_sdl_enumerate_gamepads': 'rc_sdl_enumerate_gamepads',
   'rc_sdl_get_runtime_info': 'rc_sdl_get_runtime_info',

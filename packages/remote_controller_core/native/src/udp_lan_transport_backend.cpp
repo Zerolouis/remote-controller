@@ -78,15 +78,15 @@ bool ReceiveAll(const SOCKET socket, void* data, const int length) {
 
 protocol::PlaintextControlFrameV1 MakeControlFrame(
     const protocol::ControlMessageType type, const std::uint32_t session_id,
-    const std::uint64_t sequence = 0,
-    const RumbleCommand rumble = {}) {
+    const std::uint64_t sequence = 0, const RumbleCommand rumble = {},
+    const std::uint16_t pairing_key = 0) {
   return {
       protocol::kControlMagic,
       protocol::kProtocolVersion,
       static_cast<std::uint8_t>(type),
       0,
       protocol::kControlFrameSize,
-      0,
+      pairing_key,
       session_id,
       sequence,
       rumble.low_frequency_motor,
@@ -103,6 +103,19 @@ bool ValidControlFrame(const protocol::PlaintextControlFrameV1& frame,
          frame.frame_length == protocol::kControlFrameSize &&
          frame.message_type == static_cast<std::uint8_t>(expected) &&
          frame.session_id == session_id;
+}
+
+// True when the frame is the server's rejection of a HELLO whose pairing key
+// did not match. The reason rides in the `sequence` field of a kError frame.
+bool PairingMismatchResponse(const protocol::PlaintextControlFrameV1& frame,
+                             const std::uint32_t session_id) {
+  return frame.magic == protocol::kControlMagic &&
+         frame.version == protocol::kProtocolVersion &&
+         frame.frame_length == protocol::kControlFrameSize &&
+         frame.message_type ==
+             static_cast<std::uint8_t>(protocol::ControlMessageType::kError) &&
+         frame.session_id == session_id &&
+         frame.sequence == protocol::kControlErrorPairingKeyMismatch;
 }
 
 bool ResolveIpv4(const std::string& host, const std::uint16_t port,
@@ -179,16 +192,23 @@ std::string AddressText(const sockaddr_in& address) {
 }  // namespace
 
 UdpLanTransportBackend::UdpLanTransportBackend(std::string server_address,
-                                               const std::uint16_t port)
+                                               const std::uint16_t port,
+                                               const std::uint16_t pairing_key)
     : role_(Role::kClient),
       server_address_(std::move(server_address)),
-      port_(port) {}
+      port_(port),
+      pairing_key_(pairing_key) {}
 
 UdpLanTransportBackend::UdpLanTransportBackend(
     const std::uint16_t listen_port)
-    : role_(Role::kServer), port_(listen_port) {}
+    : role_(Role::kServer), port_(listen_port), pairing_key_(0) {}
 
 UdpLanTransportBackend::~UdpLanTransportBackend() { Stop(); }
+
+void UdpLanTransportBackend::SetExpectedPairingKey(
+    const std::uint16_t pairing_key) noexcept {
+  expected_pairing_key_ = pairing_key;
+}
 
 bool UdpLanTransportBackend::StartClient(
     StateCallback state_callback, RumbleCallback rumble_callback,
@@ -296,11 +316,31 @@ bool UdpLanTransportBackend::StartClientSockets() {
 
   const std::uint32_t session_id = RandomSessionId();
   const auto hello = MakeControlFrame(protocol::ControlMessageType::kHello,
-                                      session_id);
-  protocol::PlaintextControlFrameV1 ack{};
+                                      session_id, 0, {}, pairing_key_);
+  protocol::PlaintextControlFrameV1 response{};
   if (!SendAll(control, &hello, sizeof(hello)) ||
-      !ReceiveAll(control, &ack, sizeof(ack)) ||
-      !ValidControlFrame(ack, protocol::ControlMessageType::kHelloAck,
+      !ReceiveAll(control, &response, sizeof(response))) {
+    const auto error = static_cast<std::uint32_t>(WSAGetLastError());
+    {
+      std::lock_guard lock(mutex_);
+      CloseSocket(input_socket_);
+      CloseSocket(control_socket_);
+    }
+    SetError(error == 0 ? WSAEPROTONOSUPPORT : error,
+             "The trusted-LAN control handshake failed.");
+    return false;
+  }
+  if (PairingMismatchResponse(response, session_id)) {
+    {
+      std::lock_guard lock(mutex_);
+      CloseSocket(input_socket_);
+      CloseSocket(control_socket_);
+    }
+    SetError(protocol::kPairingKeyMismatchError,
+             "The pairing key did not match the server.");
+    return false;
+  }
+  if (!ValidControlFrame(response, protocol::ControlMessageType::kHelloAck,
                          session_id)) {
     const auto error = static_cast<std::uint32_t>(WSAGetLastError());
     {
@@ -379,47 +419,57 @@ bool UdpLanTransportBackend::StartServerSockets() {
   }
 
   sockaddr_in peer{};
-  int peer_length = sizeof(peer);
   SOCKET control = INVALID_SOCKET;
+  protocol::PlaintextControlFrameV1 hello{};
+  const auto expected_pairing_key =
+      static_cast<std::uint16_t>(expected_pairing_key_.load());
   while (!stop_requested_) {
     if (!WaitForSocket(listener, false, std::chrono::milliseconds(100))) {
       continue;
     }
+    int peer_length = sizeof(peer);
     control = accept(listener, reinterpret_cast<sockaddr*>(&peer),
                      &peer_length);
-    if (control != INVALID_SOCKET) {
-      break;
+    if (control == INVALID_SOCKET) {
+      if (!stop_requested_) {
+        SetError(WSAGetLastError(), "The TCP client could not be accepted.");
+      }
+      return false;
     }
-    if (!stop_requested_) {
-      SetError(WSAGetLastError(), "The TCP client could not be accepted.");
+    SetSocketTimeout(control, SO_RCVTIMEO, 1000);
+    SetSocketTimeout(control, SO_SNDTIMEO, 1000);
+
+    const bool valid_hello =
+        ReceiveAll(control, &hello, sizeof(hello)) && hello.session_id != 0 &&
+        ValidControlFrame(hello, protocol::ControlMessageType::kHello,
+                          hello.session_id);
+    if (!valid_hello) {
+      // Malformed handshake: drop it and keep listening.
+      CloseSocket(control);
+      continue;
     }
-    return false;
+    if (hello.pairing_key != expected_pairing_key) {
+      // Wrong pairing key: tell the client why, then keep listening for a
+      // correctly-paired client instead of faulting the whole server.
+      const auto rejection = MakeControlFrame(
+          protocol::ControlMessageType::kError, hello.session_id,
+          protocol::kControlErrorPairingKeyMismatch);
+      static_cast<void>(SendAll(control, &rejection, sizeof(rejection)));
+      CloseSocket(control);
+      SetError(protocol::kPairingKeyMismatchError,
+               "A client presented a wrong pairing key and was rejected.");
+      continue;
+    }
+    break;
   }
   if (stop_requested_ || control == INVALID_SOCKET) {
     return false;
   }
-  SetSocketTimeout(control, SO_RCVTIMEO, 1000);
-  SetSocketTimeout(control, SO_SNDTIMEO, 1000);
   {
     std::lock_guard lock(mutex_);
     control_socket_ = control;
   }
 
-  protocol::PlaintextControlFrameV1 hello{};
-  if (!ReceiveAll(control, &hello, sizeof(hello)) || hello.session_id == 0 ||
-      !ValidControlFrame(hello, protocol::ControlMessageType::kHello,
-                         hello.session_id)) {
-    const auto error = static_cast<std::uint32_t>(WSAGetLastError());
-    {
-      std::lock_guard lock(mutex_);
-      if (control_socket_ == control) {
-        CloseSocket(control_socket_);
-      }
-    }
-    SetError(error == 0 ? WSAEPROTONOSUPPORT : error,
-             "The trusted-LAN client handshake was rejected.");
-    return false;
-  }
   const auto ack = MakeControlFrame(protocol::ControlMessageType::kHelloAck,
                                     hello.session_id);
   if (!SendAll(control, &ack, sizeof(ack))) {

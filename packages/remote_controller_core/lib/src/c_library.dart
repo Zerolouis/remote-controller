@@ -18,6 +18,7 @@ CLibrary createRemoteControllerLibrary({
     'native/src/local_controller_bridge.cpp',
     'native/src/memory_virtual_controller_backend.cpp',
     'native/src/input_capture.cpp',
+    'native/src/pairing_key_store.cpp',
     'native/src/remote_controller_core.cpp',
     'native/src/sdl_input_backend.cpp',
     'native/src/session.cpp',

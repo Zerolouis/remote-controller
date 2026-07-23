@@ -5,6 +5,8 @@
 
 #include <utility>
 
+#include "pairing_key_store.h"
+
 namespace remote_controller {
 
 LanControllerClient::LanControllerClient(
@@ -238,6 +240,7 @@ Result LanControllerServer::Start() {
     state_ = SessionState::kRunning;
     stop_requested_ = false;
   }
+  transport_backend_->SetExpectedPairingKey(PairingKeyStore::Get());
   worker_ = std::thread(&LanControllerServer::StartWorker, this);
   return Result::kOk;
 }

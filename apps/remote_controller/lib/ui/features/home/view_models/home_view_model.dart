@@ -40,6 +40,8 @@ final class HomeViewModel extends ChangeNotifier {
   Object? _bridgeError;
   Timer? _bridgePollTimer;
   String _serverAddress = '127.0.0.1';
+  int _pairingKey = 0;
+  String? _serverPairingCode;
   int? _lanClientDeviceId;
   bool _lanServerActive = false;
   LanSessionStatus? _lanSessionStatus;
@@ -66,6 +68,8 @@ final class HomeViewModel extends ChangeNotifier {
   LocalBridgeSnapshot? get localBridgeSnapshot => _localBridgeSnapshot;
   Object? get bridgeError => _bridgeError;
   String get serverAddress => _serverAddress;
+  int get pairingKey => _pairingKey;
+  String? get serverPairingCode => _serverPairingCode;
   int? get lanClientDeviceId => _lanClientDeviceId;
   bool get lanServerActive => _lanServerActive;
   LanSessionStatus? get lanSessionStatus => _lanSessionStatus;
@@ -76,6 +80,7 @@ final class HomeViewModel extends ChangeNotifier {
       _coreInfo = _coreRepository.getCoreInfo();
       _inputRuntime = _coreRepository.getInputRuntime();
       _virtualControllerRuntime = _coreRepository.getVirtualControllerRuntime();
+      _serverPairingCode = _coreRepository.pairingCode().toString().padLeft(4, '0');
       _coreError = null;
     } on Object catch (error) {
       _coreInfo = null;
@@ -288,6 +293,32 @@ final class HomeViewModel extends ChangeNotifier {
     _serverAddress = value;
   }
 
+  void setPairingKey(String value) {
+    final parsed = int.tryParse(value);
+    if (parsed == null || parsed < 0 || parsed > 9999) {
+      return;
+    }
+    _pairingKey = parsed;
+  }
+
+  void refreshServerPairingCode() {
+    try {
+      _serverPairingCode = _coreRepository.pairingCode().toString().padLeft(4, '0');
+    } on Object {
+      _serverPairingCode = '----';
+    }
+    notifyListeners();
+  }
+
+  void regenerateServerPairingCode() {
+    try {
+      _serverPairingCode = _coreRepository.regeneratePairingCode().toString().padLeft(4, '0');
+    } on Object {
+      _serverPairingCode = '----';
+    }
+    notifyListeners();
+  }
+
   void startLanClient(InputDevice device) {
     final address = _serverAddress.trim();
     if (address.isEmpty) {
@@ -299,7 +330,7 @@ final class HomeViewModel extends ChangeNotifier {
     stopLocalBridge();
     stopLanClient();
     try {
-      _coreRepository.startLanClient(device.instanceId, address);
+      _coreRepository.startLanClient(device.instanceId, address, pairingKey: _pairingKey);
       _lanClientDeviceId = device.instanceId;
       _lanServerActive = false;
       _lanSessionStatus = _coreRepository.getLanClientStatus();
@@ -332,6 +363,7 @@ final class HomeViewModel extends ChangeNotifier {
     stopLanServer();
     try {
       _coreRepository.startLanServer();
+      _serverPairingCode = _coreRepository.pairingCode().toString().padLeft(4, '0');
       _lanServerActive = true;
       _lanClientDeviceId = null;
       _lanSessionStatus = _coreRepository.getLanServerStatus();

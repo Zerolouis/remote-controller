@@ -558,6 +558,22 @@ class _LanSessionCard extends StatelessWidget {
                 ),
               ),
               const SizedBox(height: 10),
+              TextFormField(
+                key: const Key('lan-pairing-key'),
+                initialValue: viewModel.pairingKey == 0 ? '' : viewModel.pairingKey.toString().padLeft(4, '0'),
+                enabled: !active,
+                onChanged: viewModel.setPairingKey,
+                keyboardType: TextInputType.number,
+                maxLength: 4,
+                decoration: const InputDecoration(
+                  labelText: '配对密钥（4 位数字）',
+                  hintText: '留空表示不配对',
+                  prefixIcon: Icon(Icons.vpn_key_rounded),
+                  border: OutlineInputBorder(),
+                  counterText: '',
+                ),
+              ),
+              const SizedBox(height: 10),
               Text(
                 active ? '已使用所选手柄启动发送；请在设备卡片中停止。' : '填写电脑地址后，在上方目标手柄卡片点击“发送到电脑”。',
                 style: const TextStyle(color: Colors.white70),
@@ -576,6 +592,49 @@ class _LanSessionCard extends StatelessWidget {
                 label: Text(active ? '停止局域网服务' : '监听 TCP/UDP 26760'),
               ),
               const SizedBox(height: 10),
+              if (viewModel.serverPairingCode != null) ...[
+                DecoratedBox(
+                  decoration: BoxDecoration(
+                    color: const Color(0xff0b1220),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: const Color(0xff2dd4bf)),
+                  ),
+                  child: Padding(
+                    padding: const EdgeInsets.all(14),
+                    child: Row(
+                      children: [
+                        const Icon(Icons.vpn_key_rounded, color: Color(0xff5eead4)),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              const Text('配对密钥', style: TextStyle(color: Colors.white70, fontSize: 12)),
+                              const SizedBox(height: 4),
+                              Text(
+                                viewModel.serverPairingCode!,
+                                style: const TextStyle(
+                                  fontSize: 28,
+                                  fontWeight: FontWeight.w700,
+                                  fontFamily: 'Consolas',
+                                  color: Color(0xff5eead4),
+                                  letterSpacing: 8,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        OutlinedButton.icon(
+                          onPressed: active ? viewModel.regenerateServerPairingCode : null,
+                          icon: const Icon(Icons.refresh_rounded),
+                          label: const Text('重新生成'),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 10),
+              ],
               const Text(
                 '首次监听时 Windows 防火墙可能要求允许专用网络访问。服务端一次只接受一个客户端。',
                 style: TextStyle(color: Colors.white70),
@@ -587,6 +646,30 @@ class _LanSessionCard extends StatelessWidget {
                 '局域网会话错误：${viewModel.lanSessionError}',
                 key: const Key('lan-session-error'),
                 style: const TextStyle(color: Color(0xffff8fa3)),
+              ),
+            ],
+            if (status?.pairingKeyMismatch == true) ...[
+              const SizedBox(height: 12),
+              const DecoratedBox(
+                decoration: BoxDecoration(
+                  color: Color(0xff35191d),
+                  borderRadius: BorderRadius.all(Radius.circular(10)),
+                ),
+                child: Padding(
+                  padding: EdgeInsets.all(12),
+                  child: Row(
+                    children: [
+                      Icon(Icons.key_off_rounded, color: Color(0xffff8fa3)),
+                      SizedBox(width: 10),
+                      Expanded(
+                        child: Text(
+                          '配对密钥不匹配，服务端拒绝了连接。请确认密钥后重试。',
+                          style: TextStyle(color: Color(0xffff8fa3)),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
               ),
             ],
             if (status != null) ...[

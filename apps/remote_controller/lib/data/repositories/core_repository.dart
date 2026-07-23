@@ -33,7 +33,7 @@ abstract interface class CoreRepository {
 
   void stopLocalBridge();
 
-  void startLanClient(int instanceId, String serverAddress);
+  void startLanClient(int instanceId, String serverAddress, {int pairingKey = 0});
 
   LanSessionStatus getLanClientStatus();
 
@@ -44,6 +44,10 @@ abstract interface class CoreRepository {
   LanSessionStatus getLanServerStatus();
 
   void stopLanServer();
+
+  int pairingCode();
+
+  int regeneratePairingCode();
 
   void dispose();
 }

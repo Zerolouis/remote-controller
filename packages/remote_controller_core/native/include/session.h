@@ -23,6 +23,10 @@ enum class Result : std::int32_t {
   kInvalidState = 2,
   kStaleSequence = 3,
   kBackendFailure = 4,
+  // The LAN handshake failed because the pairing key did not match. The
+  // asynchronous LAN path surfaces this via the snapshot last_error sentinel
+  // protocol::kPairingKeyMismatchError rather than a synchronous return.
+  kPairingKeyMismatch = 7,
 };
 
 enum class SessionState : std::uint32_t {

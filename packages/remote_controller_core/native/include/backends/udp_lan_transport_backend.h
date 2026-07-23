@@ -37,12 +37,18 @@ struct UdpLanTransportSnapshot {
 
 class UdpLanTransportBackend final : public TransportBackend {
  public:
-  UdpLanTransportBackend(std::string server_address, std::uint16_t port);
+  UdpLanTransportBackend(std::string server_address, std::uint16_t port,
+                         std::uint16_t pairing_key);
   explicit UdpLanTransportBackend(std::uint16_t listen_port);
   ~UdpLanTransportBackend() override;
 
   UdpLanTransportBackend(const UdpLanTransportBackend&) = delete;
   UdpLanTransportBackend& operator=(const UdpLanTransportBackend&) = delete;
+
+  // Server role only: sets the 4-digit pairing code a client must present in
+  // its HELLO. Must be called before StartServer; clients with a different
+  // code are rejected and the server keeps listening.
+  void SetExpectedPairingKey(std::uint16_t pairing_key) noexcept;
 
   bool StartClient(StateCallback state_callback,
                    RumbleCallback rumble_callback,
@@ -74,6 +80,8 @@ class UdpLanTransportBackend final : public TransportBackend {
   const Role role_;
   const std::string server_address_;
   const std::uint16_t port_;
+  const std::uint16_t pairing_key_;
+  std::atomic_uint32_t expected_pairing_key_{0};
 
   mutable std::mutex mutex_;
   std::mutex control_send_mutex_;

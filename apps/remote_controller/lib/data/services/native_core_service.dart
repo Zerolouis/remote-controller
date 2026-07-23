@@ -74,7 +74,7 @@ final class NativeCoreService {
     _localBridge = null;
   }
 
-  void startLanClient(int instanceId, String serverAddress) {
+  void startLanClient(int instanceId, String serverAddress, {int pairingKey = 0}) {
     stopInputCapture();
     stopLocalBridge();
     stopLanServer();
@@ -82,6 +82,7 @@ final class NativeCoreService {
     final client = LanController.createClient(
       instanceId: instanceId,
       serverAddress: serverAddress,
+      pairingKey: pairingKey,
     );
     try {
       client.start();
@@ -132,6 +133,10 @@ final class NativeCoreService {
     _lanServer?.close();
     _lanServer = null;
   }
+
+  int pairingCode() => LanController.pairingCode();
+
+  int regeneratePairingCode() => LanController.regeneratePairingCode();
 
   void dispose() {
     stopInputCapture();

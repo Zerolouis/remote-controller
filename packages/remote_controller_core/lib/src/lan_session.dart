@@ -61,22 +61,59 @@ final class LanSessionSnapshot {
   final int lastError;
   final String peerAddress;
   final String error;
+
+  /// Whether the trusted-LAN handshake failed because the client presented a
+  /// pairing key that did not match the server.
+  bool get pairingKeyMismatch =>
+      lastError == LanController.pairingKeyMismatchError;
 }
 
 abstract final class LanController {
   static const int defaultPort = 26760;
   static const int _resultOk = 0;
 
+  /// Snapshot `lastError` value signalling a pairing-key mismatch. Mirrors the
+  /// native `protocol::kPairingKeyMismatchError` sentinel ("RC" | 1).
+  static const int pairingKeyMismatchError = 0x52430001;
+
   static LanControllerClient createClient({
     required int instanceId,
     required String serverAddress,
     int port = defaultPort,
-  }) => LanControllerClient._create(instanceId, serverAddress, port);
+    int pairingKey = 0,
+  }) => LanControllerClient._create(instanceId, serverAddress, port, pairingKey);
 
   static LanControllerServer createServer({
     int port = defaultPort,
     Duration inputTimeout = const Duration(milliseconds: 100),
   }) => LanControllerServer._create(port, inputTimeout);
+
+  /// Returns the persisted 4-digit pairing code (0..9999) a client must
+  /// present, generating and persisting it on first use.
+  static int pairingCode() {
+    final outCode = calloc<Uint16>();
+    try {
+      _checkResult('rc_pairing_get_code', native.rc_pairing_get_code(outCode));
+      return outCode.value;
+    } finally {
+      calloc.free(outCode);
+    }
+  }
+
+  /// Generates and persists a fresh 4-digit pairing code, invalidating the
+  /// previous one (and any client history referencing it).
+  static int regeneratePairingCode() {
+    final outCode = calloc<Uint16>();
+    try {
+      _checkResult(
+        'rc_pairing_regenerate',
+        native.rc_pairing_regenerate(outCode),
+      );
+      return outCode.value;
+    } finally {
+      calloc.free(outCode);
+    }
+  }
 
   static void _checkResult(String operation, int result) {
     if (result != _resultOk) {
@@ -123,10 +160,17 @@ final class LanControllerClient {
     int instanceId,
     String serverAddress,
     int port,
+    int pairingKey,
   ) {
     final address = serverAddress.trim();
-    if (address.isEmpty || port <= 0 || port > 65535) {
-      throw ArgumentError('A valid server address and port are required.');
+    if (address.isEmpty ||
+        port <= 0 ||
+        port > 65535 ||
+        pairingKey < 0 ||
+        pairingKey > 9999) {
+      throw ArgumentError(
+        'A valid server address, port and 4-digit pairing key are required.',
+      );
     }
     final nativeAddress = address.toNativeUtf8();
     final outClient = calloc<Pointer<native.rc_lan_controller_client>>();
@@ -137,6 +181,7 @@ final class LanControllerClient {
           instanceId,
           nativeAddress.cast(),
           port,
+          pairingKey,
           outClient,
         ),
       );

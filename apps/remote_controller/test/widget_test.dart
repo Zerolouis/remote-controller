@@ -227,6 +227,7 @@ final class _FakeCoreRepository implements CoreRepository {
   bool lanClientStarted = false;
   bool lanServerStarted = false;
   String? lastServerAddress;
+  int lastPairingKey = 0;
 
   @override
   CoreInfo getCoreInfo() => const CoreInfo(
@@ -340,9 +341,10 @@ final class _FakeCoreRepository implements CoreRepository {
   void stopLocalBridge() {}
 
   @override
-  void startLanClient(int instanceId, String serverAddress) {
+  void startLanClient(int instanceId, String serverAddress, {int pairingKey = 0}) {
     lanClientStarted = true;
     lastServerAddress = serverAddress;
+    lastPairingKey = pairingKey;
   }
 
   @override
@@ -365,6 +367,12 @@ final class _FakeCoreRepository implements CoreRepository {
   void stopLanServer() {
     lanServerStarted = false;
   }
+
+  @override
+  int pairingCode() => 1234;
+
+  @override
+  int regeneratePairingCode() => 5678;
 
   @override
   void dispose() {}
@@ -390,5 +398,6 @@ final class _FakeCoreRepository implements CoreRepository {
     peerAddress: '192.168.1.40',
     lastError: 0,
     error: '',
+    pairingKeyMismatch: false,
   );
 }
